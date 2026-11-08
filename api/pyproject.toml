@@ -14,11 +14,14 @@ dependencies = [
 dev = [
     "httpx2>=2.16.0",
     "pytest>=9.2.0",
+    "pytest-django>=4.14.0",
     "ruff>=0.17.4",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+DJANGO_SETTINGS_MODULE = "config.settings"
+addopts = "--reuse-db"
 
 [tool.ruff]
 line-length = 100

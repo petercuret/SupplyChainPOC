@@ -49,6 +49,10 @@ api-dev: db-up api-migrate
 api-migrate:
     cd api && uv run python manage.py migrate
 
+# Import the CSVs in api/seed_data into the graph (safe to re-run)
+api-seed: db-up api-migrate
+    cd api && uv run python manage.py import_seed
+
 api-makemigrations:
     cd api && uv run python manage.py makemigrations
 

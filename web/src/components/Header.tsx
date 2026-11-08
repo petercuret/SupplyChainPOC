@@ -7,7 +7,7 @@ export function Header() {
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div">
-          Supply Chain POC
+          FairToy · Child labor exposure
         </Typography>
       </Toolbar>
     </AppBar>

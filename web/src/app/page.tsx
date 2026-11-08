@@ -1,15 +1,11 @@
 import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
 
-import { HelloMessage } from "@/components/HelloMessage";
+import { Dashboard } from "@/components/Dashboard";
 
 export default function Home() {
   return (
-    <Container maxWidth="md" sx={{ py: 6 }}>
-      <Typography variant="overline" color="text.secondary">
-        Message from the API
-      </Typography>
-      <HelloMessage />
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Dashboard />
     </Container>
   );
 }

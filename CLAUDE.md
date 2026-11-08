@@ -9,9 +9,13 @@ All common tasks go through the root `justfile`. Run `just` to list the recipes.
 justfile              # Entry point for every dev task
 api/                  # Python 3.12, managed with uv
   main.py             # FastAPI app: all HTTP endpoints live here (or in routers it includes)
+  routers/            # catalog.py (finishers, toys, suppliers, exposure), incidents.py (CRUD)
+  schemas.py          # Pydantic request/response models
   config/settings.py  # Django settings (ORM + migrations only; no Django views/urls)
   config/django.py    # Calls django.setup(); main.py imports it first
   core/               # Django app: ORM models in core/models.py, migrations in core/migrations/
+    graph.py          # Edge validation + recursive-CTE traversals (exposure)
+    importer.py       # seed_data/*.csv -> graph (`just api-seed`)
   tests/              # pytest, uses FastAPI TestClient
   docker-compose.yml  # Postgres 17 for local dev
 web/                  # Next.js 16 (App Router) + React 19 + TypeScript, managed with npm
@@ -22,6 +26,13 @@ web/                  # Next.js 16 (App Router) + React 19 + TypeScript, managed
 
 ## Architecture
 
+- **The supply chain is a generic graph.** `Node` (kind: organization | facility | item, plus a
+  `role` such as finisher/supplier/factory/product/part) and `Edge` (contains | made_at |
+  operated_by). Edges point from dependent to dependency (toy -> part -> factory -> supplier).
+  Create edges via `core.graph.create_edge` (validates kinds against `ALLOWED_EDGES`).
+  Products are tenant-scoped with `Node.owner` (the finisher); suppliers, factories, parts are shared.
+- `Incident` attaches to any node; `type` is a free normalized string, `severity` a fixed choice.
+  Only `open` incidents propagate. Exposure = reverse traversal (`core.graph.find_exposure`).
 - **Django is only the ORM.** FastAPI serves HTTP. Don't add Django views, URLs or middleware.
   `config.django` must be imported before any Django model, which is why it is the first import in `main.py`.
 - Django ORM calls are synchronous. Use plain `def` endpoints (FastAPI runs them in a threadpool), or
@@ -45,6 +56,7 @@ just lint               # ruff + eslint + tsc
 just api-format         # auto-fix Python lint/formatting
 just api-makemigrations # after changing Django models
 just api-migrate
+just api-seed           # import api/seed_data/*.csv (idempotent)
 just db-reset           # wipe the local database
 ```
 
