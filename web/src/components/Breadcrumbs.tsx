@@ -22,14 +22,14 @@ export function Breadcrumbs() {
   const finisher = finishers.data?.find((f) => f.id === finisherId);
   const toy = graph.data?.nodes.find((n) => n.id === graph.data?.root_id);
 
-  const crumbs: { label: string; href?: string }[] = [];
+  const crumbs: { label: string; detail?: string; href?: string }[] = [];
   if (pathname === "/") {
     crumbs.push({ label: view === "incidents" ? "All finishers" : (finisher?.name ?? "") });
     crumbs.push({ label: VIEW_TITLES[view] });
   } else if (toyId) {
     crumbs.push({ label: finisher?.name ?? "" });
     crumbs.push({ label: "Toys", href: viewHref(finisherId, "toys") });
-    crumbs.push({ label: toy ? `${toy.name} · graph` : "Graph" });
+    crumbs.push({ label: toy?.name ?? "Graph", detail: toy?.external_id });
   }
 
   return (
@@ -57,6 +57,11 @@ export function Breadcrumbs() {
             aria-current={last ? "page" : undefined}
           >
             {crumb.label}
+            {crumb.detail && (
+              <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                {crumb.detail}
+              </Typography>
+            )}
           </Typography>
         );
       })}

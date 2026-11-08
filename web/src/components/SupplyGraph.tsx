@@ -4,9 +4,13 @@ import "@xyflow/react/dist/style.css";
 
 import Box from "@mui/material/Box";
 import { blueGrey } from "@mui/material/colors";
+import Divider from "@mui/material/Divider";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import { useColorScheme } from "@mui/material/styles";
+import Switch from "@mui/material/Switch";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import {
   Background,
@@ -83,7 +87,14 @@ function SupplyNodeCard({ data }: NodeProps<SupplyNode>) {
 
 const nodeTypes = { supply: SupplyNodeCard };
 
-export function SupplyGraph({ graph, onlyExposure }: { graph: GraphData; onlyExposure: boolean }) {
+type Props = {
+  graph: GraphData;
+  onlyExposure: boolean;
+  canFilter: boolean; // false when the toy has no exposure paths to filter to
+  onOnlyExposureChange: (value: boolean) => void;
+};
+
+export function SupplyGraph({ graph, onlyExposure, canFilter, onOnlyExposureChange }: Props) {
   const { mode, systemMode } = useColorScheme();
 
   const { nodes, edges, focus, roles } = useMemo(() => {
@@ -164,6 +175,22 @@ export function SupplyGraph({ graph, onlyExposure }: { graph: GraphData; onlyExp
       <Panel position="top-right">
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Stack spacing={0.75}>
+            <Tooltip title={canFilter ? "" : "This toy has no exposure paths"}>
+              <FormControlLabel
+                sx={{ mx: 0, mb: 0.5, gap: 1 }}
+                control={
+                  <Switch
+                    size="small"
+                    color="error"
+                    checked={onlyExposure}
+                    disabled={!canFilter}
+                    onChange={(e) => onOnlyExposureChange(e.target.checked)}
+                  />
+                }
+                label={<Typography variant="body2">Only exposure paths</Typography>}
+              />
+            </Tooltip>
+            <Divider sx={{ mb: 0.5 }} />
             {Object.entries(ROLE_STYLES)
               .filter(([role]) => roles.has(role))
               .map(([, { label, color, Icon }]) => (

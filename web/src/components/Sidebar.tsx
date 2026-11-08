@@ -25,14 +25,6 @@ const ITEMS: { view: View; label: string; color: string; Icon: SvgIconComponent 
   { view: "incidents", label: "Incidents", color: red[600], Icon: ReportProblem },
 ];
 
-function SectionLabel({ children }: { children: string }) {
-  return (
-    <Typography variant="overline" color="text.secondary" sx={{ display: "block", px: 1, mb: 0.5 }}>
-      {children}
-    </Typography>
-  );
-}
-
 export function Sidebar() {
   const { finishers, finisherId, view } = useView();
   const router = useRouter();
@@ -49,10 +41,12 @@ export function Sidebar() {
         borderRight: { md: "1px solid var(--mui-palette-divider)" },
         borderBottom: { xs: "1px solid var(--mui-palette-divider)", md: "none" },
         px: 2,
-        py: 2.5,
+        // Same top padding as the toolbars above the tables, so the finisher select lines up
+        // with their search field.
+        pt: 2,
+        pb: 2.5,
       }}
     >
-      <SectionLabel>Finisher</SectionLabel>
       <TextField
         select
         fullWidth
@@ -72,7 +66,6 @@ export function Sidebar() {
           </MenuItem>
         ))}
       </TextField>
-      <SectionLabel>Views</SectionLabel>
       <List disablePadding sx={{ display: "grid", gap: 0.5 }}>
         {ITEMS.map(({ view: itemView, label, color, Icon }) => {
           const selected = onDashboard ? view === itemView : itemView === "toys";
