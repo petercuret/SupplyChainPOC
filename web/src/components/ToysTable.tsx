@@ -1,11 +1,9 @@
 "use client";
 
 import AccountTree from "@mui/icons-material/AccountTree";
-import CheckCircle from "@mui/icons-material/CheckCircle";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Collapse from "@mui/material/Collapse";
 import IconButton from "@mui/material/IconButton";
@@ -23,7 +21,7 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 import useSWR from "swr";
 
-import { SeverityChip } from "@/components/SeverityChip";
+import { ExposureChip } from "@/components/SeverityChip";
 import { ToyDetail } from "@/components/ToyDetail";
 import { DataCard, EmptyRow, matches, NodeLabel, SearchField } from "@/components/ui";
 import { fetcher } from "@/lib/api";
@@ -122,18 +120,7 @@ export function ToysTable({ finisherId }: { finisherId: number }) {
                       ${Number(toy.attrs.retail_price_usd).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {severity ? (
-                        <SeverityChip severity={severity} label="Exposed" />
-                      ) : (
-                        <Chip
-                          size="small"
-                          label="Clear"
-                          variant="outlined"
-                          color="success"
-                          icon={<CheckCircle />}
-                          sx={{ pl: 0.75, "& .MuiChip-icon": { fontSize: 16, ml: 0, mr: 0.25 } }}
-                        />
-                      )}
+                      <ExposureChip severity={severity} />
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="Open graph view">

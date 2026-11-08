@@ -162,3 +162,103 @@ def dependency_graph(root_id: int) -> tuple[list[Node], list[Edge]]:
         Edge.objects.filter(source_id__in=node_ids, target_id__in=node_ids, kind__in=SUPPLY_EDGES)
     )
     return nodes, edges
+
+
+_AFFECTED_SQL = """
+WITH RECURSIVE walk(node_id, incident_id, nodes) AS (
+    SELECT i.node_id, i.id, ARRAY[i.node_id]
+    FROM core_incident i WHERE i.status = 'open'
+  UNION ALL
+    SELECT e.source_id, w.incident_id, w.nodes || e.source_id
+    FROM walk w JOIN core_edge e ON e.target_id = w.node_id
+    WHERE e.kind = ANY(%(kinds)s)
+      AND NOT e.source_id = ANY(w.nodes)
+      AND cardinality(w.nodes) < %(max_depth)s
+)
+SELECT DISTINCT node_id, incident_id FROM walk
+"""
+
+
+def affected_nodes() -> dict[int, list[Incident]]:
+    """Every node that is, or depends on, a node with an open incident -> those incidents."""
+    with connection.cursor() as cursor:
+        cursor.execute(_AFFECTED_SQL, {"kinds": SUPPLY_EDGES, "max_depth": MAX_DEPTH})
+        rows = cursor.fetchall()
+    incidents = Incident.objects.select_related("node").in_bulk({i for _, i in rows})
+    affected: dict[int, list[Incident]] = {}
+    for node_id, incident_id in rows:
+        affected.setdefault(node_id, []).append(incidents[incident_id])
+    return affected
+
+
+_SUPPLY_PATHS_SQL = """
+WITH RECURSIVE walk(node_id, nodes, edges) AS (
+    SELECT %(root_id)s::bigint, ARRAY[%(root_id)s::bigint], ARRAY[]::bigint[]
+  UNION ALL
+    SELECT e.target_id, w.nodes || e.target_id, w.edges || e.id
+    FROM walk w JOIN core_edge e ON e.source_id = w.node_id
+    WHERE e.kind = ANY(%(kinds)s)
+      AND NOT e.target_id = ANY(w.nodes)
+      AND cardinality(w.nodes) < %(max_depth)s
+)
+SELECT w.nodes, w.edges FROM walk w
+WHERE NOT EXISTS (
+    SELECT 1 FROM core_edge e WHERE e.source_id = w.node_id AND e.kind = ANY(%(kinds)s)
+)
+ORDER BY w.nodes
+"""
+
+
+@dataclass
+class SupplyPath:
+    nodes: list[Node]  # from the root down to the end of the chain (e.g. part -> ... -> supplier)
+    edges: list[Edge]  # edges[i] connects nodes[i] -> nodes[i + 1]
+    incidents: list[Incident]  # open incidents on any node of the path
+
+
+def supply_paths(root_id: int) -> list[SupplyPath]:
+    """Every chain from `root_id` down to a node with no further dependencies, at any depth."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            _SUPPLY_PATHS_SQL,
+            {"root_id": root_id, "kinds": SUPPLY_EDGES, "max_depth": MAX_DEPTH},
+        )
+        rows = cursor.fetchall()
+    nodes = Node.objects.in_bulk({n for path, _ in rows for n in path})
+    edges = Edge.objects.in_bulk({e for _, path in rows for e in path})
+    incidents: dict[int, list[Incident]] = {}
+    for i in Incident.objects.filter(node__in=nodes, status=Incident.Status.OPEN).select_related(
+        "node"
+    ):
+        incidents.setdefault(i.node_id, []).append(i)
+    return [
+        SupplyPath(
+            nodes=[nodes[n] for n in path_nodes],
+            edges=[edges[e] for e in path_edges],
+            incidents=[i for n in path_nodes for i in incidents.get(n, [])],
+        )
+        for path_nodes, path_edges in rows
+    ]
+
+
+_DEPENDENT_PRODUCTS_SQL = """
+WITH RECURSIVE walk(node_id) AS (
+    SELECT %(root_id)s::bigint
+  UNION
+    SELECT e.source_id FROM walk w JOIN core_edge e ON e.target_id = w.node_id
+    WHERE e.kind = ANY(%(kinds)s)
+)
+SELECT n.id FROM walk w JOIN core_node n ON n.id = w.node_id
+WHERE n.role = 'product' AND n.owner_id = %(owner_id)s
+"""
+
+
+def dependent_products(root_id: int, owner_id: int) -> list[Node]:
+    """The owner's products that depend on `root_id`, at any depth."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            _DEPENDENT_PRODUCTS_SQL,
+            {"root_id": root_id, "owner_id": owner_id, "kinds": SUPPLY_EDGES},
+        )
+        ids = [row[0] for row in cursor.fetchall()]
+    return list(Node.objects.filter(id__in=ids).order_by("name"))

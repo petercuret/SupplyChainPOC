@@ -25,7 +25,7 @@ from schemas import (
 router = APIRouter(prefix="/api", tags=["catalog"])
 
 
-def _finisher(finisher_id: int) -> Node:
+def finisher_or_404(finisher_id: int) -> Node:
     return get_or_404(Node, id=finisher_id, kind=Node.Kind.ORGANIZATION, role="finisher")
 
 
@@ -54,7 +54,7 @@ def list_finishers() -> list[NodeOut]:
 
 @router.get("/finishers/{finisher_id}/toys")
 def list_toys(finisher_id: int) -> list[ToySummary]:
-    finisher = _finisher(finisher_id)
+    finisher = finisher_or_404(finisher_id)
     severity = {e.product.id: e.severity for e in find_exposure(finisher.id)}
     toys = (
         Node.objects.filter(owner=finisher, role="product")
@@ -98,7 +98,7 @@ def _upstream(finisher: Node, kind: str, count_edge: str) -> tuple[list[Node], d
 @router.get("/finishers/{finisher_id}/suppliers")
 def list_suppliers(finisher_id: int) -> list[SupplierSummary]:
     nodes, toy_counts, affected, incidents = _upstream(
-        _finisher(finisher_id), Node.Kind.ORGANIZATION, Edge.Kind.OPERATED_BY
+        finisher_or_404(finisher_id), Node.Kind.ORGANIZATION, Edge.Kind.OPERATED_BY
     )
     return [
         SupplierSummary(
@@ -115,7 +115,7 @@ def list_suppliers(finisher_id: int) -> list[SupplierSummary]:
 @router.get("/finishers/{finisher_id}/factories")
 def list_factories(finisher_id: int) -> list[FactorySummary]:
     nodes, toy_counts, affected, incidents = _upstream(
-        _finisher(finisher_id), Node.Kind.FACILITY, Edge.Kind.MADE_AT
+        finisher_or_404(finisher_id), Node.Kind.FACILITY, Edge.Kind.MADE_AT
     )
     operators = {
         e.source_id: e.target
@@ -140,7 +140,7 @@ def list_factories(finisher_id: int) -> list[FactorySummary]:
 def list_exposure(
     finisher_id: int, type: str | None = None, min_severity: Severity | None = None
 ) -> list[ExposedToy]:
-    finisher = _finisher(finisher_id)
+    finisher = finisher_or_404(finisher_id)
     exposures = find_exposure(finisher.id, incident_type=type, min_severity=min_severity)
     exposures.sort(key=lambda e: e.product.name)
     return [_exposed_toy(e) for e in exposures]
@@ -152,6 +152,20 @@ def list_toy_parts(toy_id: int) -> list[BomLine]:
     toy = get_or_404(Node, id=toy_id, role="product")
     contains = toy.out_edges.filter(kind=Edge.Kind.CONTAINS).select_related("target")
     parts = [e.target for e in contains]
+    sources = part_sources(parts)
+    lines = [
+        BomLine(
+            part=NodeOut.model_validate(e.target),
+            quantity=e.attrs.get("quantity", 1),
+            sources=sources[e.target_id],
+        )
+        for e in contains
+    ]
+    return sorted(lines, key=lambda line: line.part.name)
+
+
+def part_sources(parts: list[Node]) -> dict[int, list[PartSource]]:
+    """Each part's factories (made_at) with the supplier operating each one."""
     made_at = Edge.objects.filter(kind=Edge.Kind.MADE_AT, source__in=parts).select_related("target")
     operators = {
         e.source_id: e.target
@@ -169,15 +183,7 @@ def list_toy_parts(toy_id: int) -> list[BomLine]:
                 unit_cost_usd=e.attrs.get("unit_cost_usd"),
             )
         )
-    lines = [
-        BomLine(
-            part=NodeOut.model_validate(e.target),
-            quantity=e.attrs.get("quantity", 1),
-            sources=sources[e.target_id],
-        )
-        for e in contains
-    ]
-    return sorted(lines, key=lambda line: line.part.name)
+    return sources
 
 
 @router.get("/nodes/{node_id}/graph")

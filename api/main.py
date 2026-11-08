@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from routers import catalog, incidents
+from routers import catalog, incidents, parts
 
 app = FastAPI(title="Supply Chain POC API")
 
@@ -17,6 +17,7 @@ app.add_middleware(
 )
 app.include_router(catalog.router)
 app.include_router(incidents.router)
+app.include_router(parts.router)
 
 
 class HelloResponse(BaseModel):

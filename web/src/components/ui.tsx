@@ -11,10 +11,11 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import type { ReactNode } from "react";
+import Chip from "@mui/material/Chip";
+import { Fragment, type ReactNode } from "react";
 
 import { styleFor } from "@/lib/nodeStyles";
-import type { GraphNode } from "@/lib/types";
+import type { GraphNode, PathStep } from "@/lib/types";
 
 /** A node's name with its type icon in the type's color, and optionally its external id. */
 export function NodeLabel({
@@ -58,6 +59,30 @@ export function LocationLabel({ text }: { text: string }) {
 
 export function PathArrow() {
   return <ArrowForward sx={{ fontSize: 16, color: "text.disabled", flexShrink: 0 }} />;
+}
+
+/**
+ * A chain of nodes joined by arrows (part ×6 → site → supplier). Factory names drop the name of
+ * the supplier that follows them, and contains-edges show their quantity.
+ */
+export function PathChain({ steps }: { steps: PathStep[] }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+      {steps.map((step, j) => {
+        const next = steps[j + 1];
+        const operator = next?.edge_kind === "operated_by" ? next.node : null;
+        return (
+          <Fragment key={step.node.id}>
+            {j > 0 && <PathArrow />}
+            <NodeLabel node={step.node} name={siteName(step.node, operator)} />
+            {step.edge_attrs.quantity !== undefined && (
+              <Chip size="small" label={`×${step.edge_attrs.quantity}`} />
+            )}
+          </Fragment>
+        );
+      })}
+    </Stack>
+  );
 }
 
 export function SearchField({

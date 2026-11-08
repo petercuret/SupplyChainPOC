@@ -2,7 +2,6 @@
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
@@ -12,11 +11,10 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import { Fragment } from "react";
 import useSWR from "swr";
 
 import { SeverityChip } from "@/components/SeverityChip";
-import { LocationLabel, NodeLabel, PathArrow, siteName } from "@/components/ui";
+import { LocationLabel, NodeLabel, PathChain, siteName } from "@/components/ui";
 import { fetcher } from "@/lib/api";
 import { type BomLine, type ExposedToy, formatType, type GraphNode } from "@/lib/types";
 
@@ -56,26 +54,8 @@ export function ToyDetail({ toyId, exposure }: { toyId: number; exposure?: Expos
                   severity={path.incident.severity}
                   label={formatType(path.incident.type)}
                 />
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
-                >
-                  {/* The toy itself is the row being expanded, so the path starts at its part. */}
-                  {path.steps.slice(1).map((step, j, steps) => {
-                    const next = steps[j + 1];
-                    const operator = next?.edge_kind === "operated_by" ? next.node : null;
-                    return (
-                      <Fragment key={step.node.id}>
-                        {j > 0 && <PathArrow />}
-                        <NodeLabel node={step.node} name={siteName(step.node, operator)} />
-                        {step.edge_attrs.quantity !== undefined && (
-                          <Chip size="small" label={`×${step.edge_attrs.quantity}`} />
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </Stack>
+                {/* The toy itself is the row being expanded, so the path starts at its part. */}
+                <PathChain steps={path.steps.slice(1)} />
               </Paper>
             ))}
           </Stack>

@@ -1,8 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from core.models import Node
+from core.graph import create_edge
+from core.models import Edge, Node
 from main import app
+from tests.conftest import make
 
 client = TestClient(app)
 
@@ -57,3 +59,25 @@ def test_factory_counts_toys_exposed_through_its_supplier(chain: dict[str, Node]
     affected = {f["factory"]["external_id"]: f["affected_toy_count"] for f in factories}
     assert affected == {"FAC": 1, "FAC-CLEAN": 0}
     assert factories[0]["supplier"]["external_id"] == "SUP"
+
+
+def test_parts_show_exposure_paths_and_clean_alternatives(chain: dict[str, Node]) -> None:
+    alternative = make(Node.Kind.ITEM, "part", "PRT-ALT")
+    alternative.name = "PRT"  # same part type as chain["part"]
+    alternative.save()
+    create_edge(Edge.Kind.MADE_AT, alternative, chain["clean_factory"])
+    client.post("/api/incidents", json={"node_id": chain["supplier"].id, "type": "child_labor"})
+    finisher = chain["finisher"].id
+
+    parts = {
+        p["part"]["external_id"]: p for p in client.get(f"/api/finishers/{finisher}/parts").json()
+    }
+    assert parts["PRT"]["severity"] == "high"
+    assert parts["PRT"]["toy_count"] == 1
+    assert parts["PRT-ALT"]["severity"] is None
+
+    detail = client.get(f"/api/finishers/{finisher}/parts/{chain['part'].id}").json()
+    flagged = {p["steps"][-1]["node"]["external_id"]: bool(p["incidents"]) for p in detail["paths"]}
+    assert flagged == {"SUP": True, "SUP-CLEAN": False}  # dual-sourced: one path is clean
+    assert [t["external_id"] for t in detail["used_in"]] == ["TOY"]
+    assert [a["part"]["external_id"] for a in detail["alternatives"]] == ["PRT-ALT"]

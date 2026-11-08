@@ -131,3 +131,22 @@ class GraphOut(BaseModel):
     nodes: list[NodeOut]
     edges: list[EdgeOut]
     incidents: list[IncidentOut]  # open incidents on any node in the graph
+
+
+class PartSummary(BaseModel):
+    part: NodeOut
+    sources: list[PartSource]
+    toy_count: int  # this finisher's toys that contain the part (at any depth)
+    severity: Severity | None  # worst open incident on any of its supply paths
+    incident_count: int
+
+
+class SupplyPathOut(BaseModel):
+    steps: list[PathStep]  # from the part down to the supplier
+    incidents: list[IncidentOut]  # open incidents on this path; empty means clean
+
+
+class PartDetail(BaseModel):
+    paths: list[SupplyPathOut]
+    used_in: list[NodeOut]  # this finisher's toys that contain the part
+    alternatives: list[PartSummary]  # other parts of the same type (same name)

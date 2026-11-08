@@ -81,3 +81,17 @@ export type GraphData = {
   edges: GraphEdge[];
   incidents: Incident[];
 };
+
+export type PartSummary = {
+  part: GraphNode;
+  sources: BomLine["sources"];
+  toy_count: number;
+  severity: Severity | null;
+  incident_count: number;
+};
+
+export type PartDetailData = {
+  paths: { steps: PathStep[]; incidents: Incident[] }[];
+  used_in: GraphNode[];
+  alternatives: PartSummary[];
+};

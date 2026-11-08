@@ -9,7 +9,8 @@ All common tasks go through the root `justfile`. Run `just` to list the recipes.
 justfile              # Entry point for every dev task
 api/                  # Python 3.12, managed with uv
   main.py             # FastAPI app: all HTTP endpoints live here (or in routers it includes)
-  routers/            # catalog.py (finishers, toys, suppliers, exposure), incidents.py (CRUD)
+  routers/            # catalog.py (finishers, toys, suppliers, factories, exposure, graph),
+                      # parts.py (parts + supply paths + alternatives), incidents.py (CRUD)
   schemas.py          # Pydantic request/response models
   config/settings.py  # Django settings (ORM + migrations only; no Django views/urls)
   config/django.py    # Calls django.setup(); main.py imports it first

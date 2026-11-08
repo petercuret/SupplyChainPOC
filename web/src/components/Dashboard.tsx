@@ -5,6 +5,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 
 import { FactoriesTable } from "@/components/FactoriesTable";
 import { IncidentsTable } from "@/components/IncidentsTable";
+import { PartsTable } from "@/components/PartsTable";
 import { SuppliersTable } from "@/components/SuppliersTable";
 import { ToysTable } from "@/components/ToysTable";
 import { useView } from "@/lib/view";
@@ -32,6 +33,7 @@ export function Dashboard() {
   return (
     <>
       {view === "toys" && <ToysTable key={finisherId} finisherId={finisherId} />}
+      {view === "parts" && <PartsTable key={finisherId} finisherId={finisherId} />}
       {view === "suppliers" && <SuppliersTable key={finisherId} finisherId={finisherId} />}
       {view === "factories" && <FactoriesTable key={finisherId} finisherId={finisherId} />}
       {view === "incidents" && <IncidentsTable />}

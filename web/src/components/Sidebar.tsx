@@ -20,6 +20,7 @@ import { type View, viewHref, useView } from "@/lib/view";
 
 const ITEMS: { view: View; label: string; color: string; Icon: SvgIconComponent }[] = [
   { view: "toys", ...ROLE_STYLES.product, label: "Toys" },
+  { view: "parts", ...ROLE_STYLES.part, label: "Parts" },
   { view: "suppliers", ...ROLE_STYLES.supplier, label: "Suppliers" },
   { view: "factories", ...ROLE_STYLES.factory, label: "Factories" },
   { view: "incidents", label: "Incidents", color: red[600], Icon: ReportProblem },

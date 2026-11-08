@@ -1,3 +1,4 @@
+import CheckCircle from "@mui/icons-material/CheckCircle";
 import ErrorOutline from "@mui/icons-material/ErrorOutlineOutlined";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import Report from "@mui/icons-material/Report";
@@ -45,5 +46,20 @@ export function SeverityChip({ severity, label, onClick }: Props) {
         }}
       />
     </Tooltip>
+  );
+}
+
+/** "Exposed" with the worst severity's icon, or a green "Clear". */
+export function ExposureChip({ severity }: { severity: Severity | null }) {
+  if (severity) return <SeverityChip severity={severity} label="Exposed" />;
+  return (
+    <Chip
+      size="small"
+      label="Clear"
+      variant="outlined"
+      color="success"
+      icon={<CheckCircle />}
+      sx={{ pl: 0.75, "& .MuiChip-icon": { fontSize: 16, ml: 0, mr: 0.25 } }}
+    />
   );
 }

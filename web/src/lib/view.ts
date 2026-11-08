@@ -6,11 +6,12 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/api";
 import type { GraphNode } from "@/lib/types";
 
-export const VIEWS = ["toys", "suppliers", "factories", "incidents"] as const;
+export const VIEWS = ["toys", "parts", "suppliers", "factories", "incidents"] as const;
 export type View = (typeof VIEWS)[number];
 
 export const VIEW_TITLES: Record<View, string> = {
   toys: "Toys",
+  parts: "Parts",
   suppliers: "Suppliers",
   factories: "Factories",
   incidents: "Incidents",
