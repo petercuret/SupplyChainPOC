@@ -8,11 +8,15 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import MenuItem from "@mui/material/MenuItem";
+import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
+import { SeverityIcon } from "@/components/SeverityChip";
+import { NodeLabel } from "@/components/ui";
 import { allApiKeys, fetcher, send } from "@/lib/api";
 import {
   formatType,
@@ -75,11 +79,12 @@ function IncidentForm({ node, incident, onClose }: Props) {
 
   return (
     <form onSubmit={submit}>
-      <DialogTitle>
-        {incident ? "Edit incident" : "Flag"} · {target.name}
-      </DialogTitle>
+      <DialogTitle sx={{ pb: 1 }}>{incident ? "Edit incident" : "Flag an incident"}</DialogTitle>
       <DialogContent>
-        <Stack spacing={2} sx={{ pt: 1 }}>
+        <Stack spacing={2.5}>
+          <Paper variant="outlined" sx={{ px: 1.5, py: 1, bgcolor: "background.default" }}>
+            <NodeLabel node={target} showId />
+          </Paper>
           {error && <Alert severity="error">{error}</Alert>}
           <Autocomplete
             freeSolo
@@ -102,8 +107,11 @@ function IncidentForm({ node, incident, onClose }: Props) {
             onChange={(e) => setSeverity(e.target.value as Severity)}
           >
             {SEVERITIES.map((s) => (
-              <MenuItem key={s} value={s} sx={{ textTransform: "capitalize" }}>
-                {s}
+              <MenuItem key={s} value={s}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <SeverityIcon severity={s} fontSize="small" />
+                  <Typography sx={{ textTransform: "capitalize" }}>{s}</Typography>
+                </Stack>
               </MenuItem>
             ))}
           </TextField>
@@ -138,9 +146,14 @@ function IncidentForm({ node, incident, onClose }: Props) {
           />
         </Stack>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="contained" disabled={saving || !type.trim()}>
+        <Button
+          type="submit"
+          variant="contained"
+          color={incident ? "primary" : "error"}
+          disabled={saving || !type.trim()}
+        >
           {incident ? "Save" : "Flag"}
         </Button>
       </DialogActions>

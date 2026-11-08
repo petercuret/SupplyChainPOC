@@ -1,8 +1,8 @@
 "use client";
 
 import AccountTree from "@mui/icons-material/AccountTree";
+import CheckCircle from "@mui/icons-material/CheckCircle";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUp from "@mui/icons-material/KeyboardArrowUp";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
@@ -25,68 +25,95 @@ import useSWR from "swr";
 
 import { SeverityChip } from "@/components/SeverityChip";
 import { ToyDetail } from "@/components/ToyDetail";
+import { DataCard, EmptyRow, matches, NodeLabel, SearchField } from "@/components/ui";
 import { fetcher } from "@/lib/api";
-import type { ExposedToy, ToySummary } from "@/lib/types";
+import { type ExposedToy, SEVERITIES, type ToySummary } from "@/lib/types";
 import { usePagination } from "@/lib/usePagination";
+
+const COLUMNS = 7;
+const rank = (t: ToySummary) => (t.severity ? SEVERITIES.indexOf(t.severity) + 1 : 0);
 
 export function ToysTable({ finisherId }: { finisherId: number }) {
   const toys = useSWR<ToySummary[]>(`/api/finishers/${finisherId}/toys`, fetcher);
   const exposure = useSWR<ExposedToy[]>(`/api/finishers/${finisherId}/exposure`, fetcher);
   const [filter, setFilter] = useState<"all" | "exposed">("all");
+  const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
 
   const all = toys.data ?? [];
-  const rows = filter === "exposed" ? all.filter((t) => t.severity) : all;
+  const exposed = all.filter((t) => t.severity);
+  // Most severe exposure first, then by name, so the toys that need action are on page one.
+  const rows = (filter === "exposed" ? exposed : all)
+    .filter((t) => matches(query, t.toy.name, t.toy.external_id))
+    .sort((a, b) => rank(b) - rank(a) || a.toy.name.localeCompare(b.toy.name));
   const { pageRows, paginationProps } = usePagination(rows);
 
   if (toys.isLoading) return <CircularProgress aria-label="Loading" />;
   if (toys.error) return <Alert severity="error">Could not load toys: {toys.error.message}</Alert>;
 
   return (
-    <Box>
-      <ToggleButtonGroup
-        size="small"
-        exclusive
-        value={filter}
-        onChange={(_, value) => value && setFilter(value)}
-        sx={{ mb: 2 }}
-      >
-        <ToggleButton value="all">All ({all.length})</ToggleButton>
-        <ToggleButton value="exposed">
-          Exposed ({all.filter((t) => t.severity).length})
-        </ToggleButton>
-      </ToggleButtonGroup>
+    <DataCard
+      toolbar={
+        <>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search by toy name or ID (e.g. TOY-0202)"
+          />
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={filter}
+            onChange={(_, value) => value && setFilter(value)}
+          >
+            <ToggleButton value="all">All ({all.length})</ToggleButton>
+            <ToggleButton value="exposed">Exposed ({exposed.length})</ToggleButton>
+          </ToggleButtonGroup>
+        </>
+      }
+    >
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox" />
               <TableCell>Toy</TableCell>
-              <TableCell>ID</TableCell>
               <TableCell align="right">Parts</TableCell>
               <TableCell align="right">Units / year</TableCell>
               <TableCell align="right">Price</TableCell>
               <TableCell>Exposure</TableCell>
-              <TableCell padding="checkbox">Graph</TableCell>
+              <TableCell align="center">Graph</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
+            {!rows.length && <EmptyRow colSpan={COLUMNS}>No toys match.</EmptyRow>}
             {pageRows.map(({ toy, part_count, severity }) => {
               const open = expanded === toy.id;
               return (
                 <Fragment key={toy.id}>
-                  <TableRow hover sx={{ "& > td": { borderBottom: "unset" } }}>
+                  <TableRow
+                    hover
+                    selected={open}
+                    sx={{ "& > td": { borderBottom: open ? "unset" : undefined } }}
+                  >
                     <TableCell padding="checkbox">
                       <IconButton
                         size="small"
                         aria-label={open ? `Collapse ${toy.name}` : `Expand ${toy.name}`}
+                        aria-expanded={open}
                         onClick={() => setExpanded(open ? null : toy.id)}
                       >
-                        {open ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                        <KeyboardArrowDown
+                          sx={{
+                            transition: "transform 150ms",
+                            transform: open ? "rotate(180deg)" : "none",
+                          }}
+                        />
                       </IconButton>
                     </TableCell>
-                    <TableCell>{toy.name}</TableCell>
-                    <TableCell>{toy.external_id}</TableCell>
+                    <TableCell>
+                      <NodeLabel node={toy} showId />
+                    </TableCell>
                     <TableCell align="right">{part_count}</TableCell>
                     <TableCell align="right">
                       {Number(toy.attrs.units_per_year).toLocaleString()}
@@ -98,11 +125,18 @@ export function ToysTable({ finisherId }: { finisherId: number }) {
                       {severity ? (
                         <SeverityChip severity={severity} label="Exposed" />
                       ) : (
-                        <Chip size="small" label="Clear" variant="outlined" color="success" />
+                        <Chip
+                          size="small"
+                          label="Clear"
+                          variant="outlined"
+                          color="success"
+                          icon={<CheckCircle />}
+                          sx={{ pl: 0.75, "& .MuiChip-icon": { fontSize: 16, ml: 0, mr: 0.25 } }}
+                        />
                       )}
                     </TableCell>
-                    <TableCell padding="checkbox">
-                      <Tooltip title="Graph view">
+                    <TableCell align="center">
+                      <Tooltip title="Open graph view">
                         <IconButton
                           size="small"
                           component={Link}
@@ -115,12 +149,14 @@ export function ToysTable({ finisherId }: { finisherId: number }) {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={8} sx={{ py: 0 }}>
+                    <TableCell colSpan={COLUMNS} sx={{ py: 0, ...(!open && { border: 0 }) }}>
                       <Collapse in={open} unmountOnExit>
-                        <ToyDetail
-                          toyId={toy.id}
-                          exposure={exposure.data?.find((e) => e.toy.id === toy.id)}
-                        />
+                        <Box sx={{ py: 2 }}>
+                          <ToyDetail
+                            toyId={toy.id}
+                            exposure={exposure.data?.find((e) => e.toy.id === toy.id)}
+                          />
+                        </Box>
                       </Collapse>
                     </TableCell>
                   </TableRow>
@@ -131,6 +167,6 @@ export function ToysTable({ finisherId }: { finisherId: number }) {
         </Table>
       </TableContainer>
       <TablePagination {...paginationProps} />
-    </Box>
+    </DataCard>
   );
 }

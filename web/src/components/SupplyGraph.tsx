@@ -2,19 +2,11 @@
 
 import "@xyflow/react/dist/style.css";
 
-import Business from "@mui/icons-material/Business";
-import Category from "@mui/icons-material/Category";
-import Extension from "@mui/icons-material/Extension";
-import Factory from "@mui/icons-material/Factory";
-import Toys from "@mui/icons-material/Toys";
 import Box from "@mui/material/Box";
-import { blueGrey, brown, deepPurple, indigo, teal } from "@mui/material/colors";
-import FormControlLabel from "@mui/material/FormControlLabel";
+import { blueGrey } from "@mui/material/colors";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import { useColorScheme } from "@mui/material/styles";
-import type { SvgIconComponent } from "@mui/icons-material";
-import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
 import {
   Background,
@@ -29,30 +21,24 @@ import {
   Position,
   ReactFlow,
 } from "@xyflow/react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { SeverityChip } from "@/components/SeverityChip";
+import { siteName } from "@/components/ui";
 import { layoutLayers, nodesReaching } from "@/lib/graphLayout";
+import { ROLE_STYLES, styleFor } from "@/lib/nodeStyles";
 import { formatType, type GraphData, type GraphNode, type Incident } from "@/lib/types";
 
-type RoleStyle = { label: string; color: string; Icon: SvgIconComponent };
-
-const ROLE_STYLES: Record<string, RoleStyle> = {
-  product: { label: "Toy", color: indigo[500], Icon: Toys },
-  part: { label: "Part", color: blueGrey[500], Icon: Extension },
-  material: { label: "Material", color: brown[400], Icon: Category },
-  factory: { label: "Factory", color: teal[500], Icon: Factory },
-  supplier: { label: "Supplier", color: deepPurple[400], Icon: Business },
+type SupplyNodeData = {
+  node: GraphNode;
+  name: string;
+  incidents: Incident[];
+  affected: boolean;
 };
-const FALLBACK_STYLE: RoleStyle = { label: "Node", color: blueGrey[300], Icon: Category };
-const styleFor = (node: GraphNode) =>
-  ROLE_STYLES[node.role] ?? { ...FALLBACK_STYLE, label: node.role };
-
-type SupplyNodeData = { node: GraphNode; incidents: Incident[]; affected: boolean };
 type SupplyNode = Node<SupplyNodeData, "supply">;
 
 function SupplyNodeCard({ data }: NodeProps<SupplyNode>) {
-  const { node, incidents, affected } = data;
+  const { node, name, incidents, affected } = data;
   const { label, color, Icon } = styleFor(node);
   const flagged = incidents.length > 0;
 
@@ -63,6 +49,7 @@ function SupplyNodeCard({ data }: NodeProps<SupplyNode>) {
         width: 220,
         px: 1.5,
         py: 1,
+        borderRadius: 2,
         borderLeft: 6,
         borderLeftColor: color,
         ...(flagged && { borderColor: "error.main", borderWidth: 2, borderLeftWidth: 6 }),
@@ -80,7 +67,7 @@ function SupplyNodeCard({ data }: NodeProps<SupplyNode>) {
         </Typography>
       </Stack>
       <Typography variant="body2" noWrap title={node.name}>
-        {node.name}
+        {name}
       </Typography>
       {flagged && (
         <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
@@ -96,16 +83,21 @@ function SupplyNodeCard({ data }: NodeProps<SupplyNode>) {
 
 const nodeTypes = { supply: SupplyNodeCard };
 
-export function SupplyGraph({ graph }: { graph: GraphData }) {
+export function SupplyGraph({ graph, onlyExposure }: { graph: GraphData; onlyExposure: boolean }) {
   const { mode, systemMode } = useColorScheme();
-  const [onlyExposure, setOnlyExposure] = useState(false);
 
-  const { nodes, edges, focus, exposed } = useMemo(() => {
+  const { nodes, edges, focus, roles } = useMemo(() => {
     const incidentsByNode = new Map<number, Incident[]>();
     for (const i of graph.incidents) {
       incidentsByNode.set(i.node.id, [...(incidentsByNode.get(i.node.id) ?? []), i]);
     }
     const affected = nodesReaching(incidentsByNode.keys(), graph.edges);
+    const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+    const operators = new Map(
+      graph.edges
+        .filter((e) => e.kind === "operated_by")
+        .map((e) => [e.source_id, byId.get(e.target_id)]),
+    );
     const visible = onlyExposure ? graph.nodes.filter((n) => affected.has(n.id)) : graph.nodes;
     const visibleIds = new Set(visible.map((n) => n.id));
     const visibleEdges = graph.edges.filter(
@@ -119,6 +111,7 @@ export function SupplyGraph({ graph }: { graph: GraphData }) {
       position: positions.get(node.id) ?? { x: 0, y: 0 },
       data: {
         node,
+        name: siteName(node, operators.get(node.id)),
         incidents: incidentsByNode.get(node.id) ?? [],
         affected: affected.has(node.id),
       },
@@ -139,7 +132,8 @@ export function SupplyGraph({ graph }: { graph: GraphData }) {
     });
     // Open zoomed onto the exposure paths; the rest of the graph is a pan or zoom away.
     const focus = visible.filter((n) => affected.has(n.id)).map((n) => ({ id: String(n.id) }));
-    return { nodes, edges, focus, exposed: affected.has(graph.root_id) };
+    const roles = new Set(graph.nodes.map((n) => n.role));
+    return { nodes, edges, focus, roles };
   }, [graph, onlyExposure]);
 
   return (
@@ -170,13 +164,15 @@ export function SupplyGraph({ graph }: { graph: GraphData }) {
       <Panel position="top-right">
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Stack spacing={0.75}>
-            {Object.values(ROLE_STYLES).map(({ label, color, Icon }) => (
-              <Stack key={label} direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <Box sx={{ width: 6, height: 18, bgcolor: color, borderRadius: 0.5 }} />
-                <Icon sx={{ fontSize: 16, color }} />
-                <Typography variant="caption">{label}</Typography>
-              </Stack>
-            ))}
+            {Object.entries(ROLE_STYLES)
+              .filter(([role]) => roles.has(role))
+              .map(([, { label, color, Icon }]) => (
+                <Stack key={label} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <Box sx={{ width: 6, height: 18, bgcolor: color, borderRadius: 0.5 }} />
+                  <Icon sx={{ fontSize: 16, color }} />
+                  <Typography variant="caption">{label}</Typography>
+                </Stack>
+              ))}
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
               <Box
                 sx={{
@@ -202,17 +198,6 @@ export function SupplyGraph({ graph }: { graph: GraphData }) {
               />
               <Typography variant="caption">On an exposure path</Typography>
             </Stack>
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={onlyExposure}
-                  disabled={!exposed}
-                  onChange={(e) => setOnlyExposure(e.target.checked)}
-                />
-              }
-              label={<Typography variant="caption">Only exposure paths</Typography>}
-            />
           </Stack>
         </Paper>
       </Panel>

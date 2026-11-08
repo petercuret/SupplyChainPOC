@@ -1,7 +1,7 @@
 "use client";
 
-import AddCircleOutline from "@mui/icons-material/AddCircleOutlineOutlined";
-import IconButton from "@mui/material/IconButton";
+import Add from "@mui/icons-material/Add";
+import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import { useState } from "react";
@@ -15,7 +15,7 @@ export function IncidentBadges({ node, incidents }: { node: GraphNode; incidents
   const [dialog, setDialog] = useState<"new" | Incident | null>(null);
 
   return (
-    <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", alignItems: "center", gap: 0.5 }}>
+    <Stack direction="row" sx={{ flexWrap: "wrap", alignItems: "center", gap: 0.75 }}>
       {incidents.map((i) => (
         <SeverityChip
           key={i.id}
@@ -24,10 +24,22 @@ export function IncidentBadges({ node, incidents }: { node: GraphNode; incidents
           onClick={() => setDialog(i)}
         />
       ))}
-      <Tooltip title={`Add incident to ${node.name}`}>
-        <IconButton size="small" color="error" onClick={() => setDialog("new")}>
-          <AddCircleOutline fontSize="small" />
-        </IconButton>
+      <Tooltip title={`Add an incident to ${node.name}`}>
+        <Chip
+          size="small"
+          variant="outlined"
+          icon={<Add />}
+          label={incidents.length ? undefined : "Flag"}
+          aria-label={`Add incident to ${node.name}`}
+          onClick={() => setDialog("new")}
+          sx={{
+            borderStyle: "dashed",
+            color: "text.secondary",
+            pl: 0.5,
+            "& .MuiChip-icon": { fontSize: 17, ml: 0, mr: incidents.length ? -0.75 : 0.25 },
+            "& .MuiChip-label": incidents.length ? { px: 0.5 } : { pl: 0.25, pr: 1.25 },
+          }}
+        />
       </Tooltip>
       {dialog === "new" && <IncidentDialog open node={node} onClose={() => setDialog(null)} />}
       {dialog && dialog !== "new" && (

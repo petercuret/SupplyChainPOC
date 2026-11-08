@@ -2,7 +2,9 @@
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -10,14 +12,18 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { Fragment } from "react";
 import useSWR from "swr";
 
 import { SeverityChip } from "@/components/SeverityChip";
+import { LocationLabel, NodeLabel, PathArrow, siteName } from "@/components/ui";
 import { fetcher } from "@/lib/api";
-import { type BomLine, type ExposedToy, formatType, type PathStep } from "@/lib/types";
+import { type BomLine, type ExposedToy, formatType, type GraphNode } from "@/lib/types";
 
-function describeStep({ node, edge_attrs }: PathStep): string {
-  return edge_attrs.quantity ? `${node.name} ×${edge_attrs.quantity}` : node.name;
+/** Country, plus the city unless the site's name already says it ("Tijuana Plant"). */
+function location(factory: GraphNode, displayName: string): string {
+  const { city, country } = factory.attrs;
+  return city && !displayName.includes(String(city)) ? `${city}, ${country}` : String(country);
 }
 
 export function ToyDetail({ toyId, exposure }: { toyId: number; exposure?: ExposedToy }) {
@@ -25,70 +31,137 @@ export function ToyDetail({ toyId, exposure }: { toyId: number; exposure?: Expos
   const onPath = new Set(exposure?.paths.flatMap((p) => p.steps.map((s) => s.node.id)));
 
   return (
-    <Box sx={{ py: 2, pl: 2 }}>
+    <Stack spacing={2.5}>
       {exposure && (
-        <Stack spacing={1} sx={{ mb: 2 }}>
-          <Typography variant="subtitle2">Why this toy is exposed</Typography>
-          {exposure.paths.map((path, i) => (
-            <Stack
-              key={i}
-              direction="row"
-              spacing={1}
-              sx={{ alignItems: "center", flexWrap: "wrap" }}
-            >
-              <SeverityChip
-                severity={path.incident.severity}
-                label={formatType(path.incident.type)}
-              />
-              <Typography variant="body2">{path.steps.map(describeStep).join(" → ")}</Typography>
-            </Stack>
-          ))}
-        </Stack>
-      )}
-      <Typography variant="subtitle2" gutterBottom>
-        Bill of materials
-      </Typography>
-      {isLoading && <CircularProgress size={20} aria-label="Loading parts" />}
-      {error && <Alert severity="error">Could not load parts: {error.message}</Alert>}
-      {data && (
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Part</TableCell>
-              <TableCell align="right">Qty</TableCell>
-              <TableCell>Made at (supplier, country)</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.map((line) => (
-              <TableRow
-                key={line.part.id}
-                sx={
-                  onPath.has(line.part.id)
-                    ? { bgcolor: "error.light", "& td": { color: "error.contrastText" } }
-                    : undefined
-                }
+        <Box>
+          <Typography variant="subtitle2" gutterBottom>
+            Why this toy is exposed
+          </Typography>
+          <Stack spacing={1}>
+            {exposure.paths.map((path, i) => (
+              <Paper
+                key={i}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  display: "flex",
+                  gap: 1.5,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  borderColor: "error.light",
+                  bgcolor: "color-mix(in srgb, var(--mui-palette-error-main) 4%, transparent)",
+                }}
               >
-                <TableCell>
-                  {line.part.name}{" "}
-                  <Typography component="span" variant="caption">
-                    ({line.part.external_id})
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">{line.quantity}</TableCell>
-                <TableCell>
-                  {line.sources
-                    .map(
-                      (s) =>
-                        `${s.factory.name} (${s.supplier?.name ?? "?"}, ${s.factory.attrs.country})`,
-                    )
-                    .join(" · ")}
-                </TableCell>
-              </TableRow>
+                <SeverityChip
+                  severity={path.incident.severity}
+                  label={formatType(path.incident.type)}
+                />
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
+                >
+                  {/* The toy itself is the row being expanded, so the path starts at its part. */}
+                  {path.steps.slice(1).map((step, j, steps) => {
+                    const next = steps[j + 1];
+                    const operator = next?.edge_kind === "operated_by" ? next.node : null;
+                    return (
+                      <Fragment key={step.node.id}>
+                        {j > 0 && <PathArrow />}
+                        <NodeLabel node={step.node} name={siteName(step.node, operator)} />
+                        {step.edge_attrs.quantity !== undefined && (
+                          <Chip size="small" label={`×${step.edge_attrs.quantity}`} />
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </Stack>
+              </Paper>
             ))}
-          </TableBody>
-        </Table>
+          </Stack>
+        </Box>
       )}
-    </Box>
+      <Box>
+        <Typography variant="subtitle2" gutterBottom>
+          Bill of materials
+        </Typography>
+        {isLoading && <CircularProgress size={20} aria-label="Loading parts" />}
+        {error && <Alert severity="error">Could not load parts: {error.message}</Alert>}
+        {data && (
+          <Paper variant="outlined" sx={{ overflow: "hidden" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Part</TableCell>
+                  <TableCell align="right">Qty</TableCell>
+                  <TableCell>Supplier</TableCell>
+                  <TableCell>Site</TableCell>
+                  <TableCell>Location</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.map((line) => {
+                  const flagged = onPath.has(line.part.id);
+                  return (
+                    <TableRow
+                      key={line.part.id}
+                      sx={
+                        flagged
+                          ? {
+                              bgcolor:
+                                "color-mix(in srgb, var(--mui-palette-error-main) 7%, transparent)",
+                            }
+                          : undefined
+                      }
+                    >
+                      <TableCell>
+                        <NodeLabel node={line.part} showId />
+                      </TableCell>
+                      <TableCell align="right">{line.quantity}</TableCell>
+                      {/* One line per source (dual-sourced parts have several), aligned across the
+                          three columns because every line is a single row of the same height. */}
+                      <TableCell>
+                        <Stack spacing={0.75}>
+                          {line.sources.map((s) =>
+                            s.supplier ? (
+                              <NodeLabel key={s.factory.id} node={s.supplier} />
+                            ) : (
+                              <Typography key={s.factory.id} variant="body2">
+                                –
+                              </Typography>
+                            ),
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Stack spacing={0.75}>
+                          {line.sources.map((s) => (
+                            <NodeLabel
+                              key={s.factory.id}
+                              node={s.factory}
+                              name={siteName(s.factory, s.supplier)}
+                            />
+                          ))}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Stack spacing={0.75}>
+                          {line.sources.map((s) => (
+                            <LocationLabel
+                              key={s.factory.id}
+                              text={location(s.factory, siteName(s.factory, s.supplier))}
+                            />
+                          ))}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Paper>
+        )}
+      </Box>
+    </Stack>
   );
 }

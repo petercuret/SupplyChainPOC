@@ -6,7 +6,7 @@ import { Dashboard } from "@/components/Dashboard";
 
 export default function Home() {
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Container maxWidth="xl" sx={{ pt: 2.5, pb: 4 }}>
       {/* Dashboard reads the finisher and view from the URL, which is only known at request time. */}
       <Suspense fallback={<CircularProgress aria-label="Loading" />}>
         <Dashboard />

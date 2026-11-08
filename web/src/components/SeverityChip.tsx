@@ -38,6 +38,11 @@ export function SeverityChip({ severity, label, onClick }: Props) {
         variant={severity === "critical" ? "filled" : "outlined"}
         label={label}
         onClick={onClick}
+        sx={{
+          pl: 0.75,
+          "& .MuiChip-icon": { fontSize: 17, ml: 0, mr: 0.25 },
+          "& .MuiChip-label": { pl: 0.5, pr: 1.25 },
+        }}
       />
     </Tooltip>
   );

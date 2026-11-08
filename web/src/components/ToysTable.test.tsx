@@ -17,6 +17,10 @@ const node = (id: number, role: string, name: string, attrs = {}): GraphNode => 
 const toy = node(1, "product", "Comet Fort", { units_per_year: 1000, retail_price_usd: 12 });
 const part = node(2, "part", "wheel");
 const supplier = { ...node(3, "supplier", "Aequs Fabrication"), kind: "organization" as const };
+const factory = {
+  ...node(5, "factory", "Aequs Fabrication — Tijuana Plant"),
+  kind: "facility" as const,
+};
 
 const responses: Record<string, unknown> = {
   "/api/finishers/7/toys": [
@@ -33,6 +37,7 @@ const responses: Record<string, unknown> = {
           steps: [
             { node: toy, edge_kind: null, edge_attrs: {} },
             { node: part, edge_kind: "contains", edge_attrs: { quantity: 4 } },
+            { node: factory, edge_kind: "made_at", edge_attrs: {} },
             { node: supplier, edge_kind: "operated_by", edge_attrs: {} },
           ],
         },
@@ -68,5 +73,11 @@ test("marks exposed toys and explains the path through the parts", async () => {
 
   fireEvent.click(screen.getByLabelText("Expand Comet Fort"));
 
-  expect(await screen.findByText("Comet Fort → wheel ×4 → Aequs Fabrication")).toBeDefined();
+  expect(await screen.findByText("Why this toy is exposed")).toBeDefined();
+  expect(screen.getByText("wheel")).toBeDefined();
+  expect(screen.getByText("×4")).toBeDefined();
+  expect(screen.getByText("Aequs Fabrication")).toBeDefined();
+  // The factory drops the supplier name it repeats, and the toy itself is not repeated.
+  expect(screen.getByText("Tijuana Plant")).toBeDefined();
+  expect(screen.getAllByText("Comet Fort")).toHaveLength(1);
 });
