@@ -92,15 +92,16 @@ export function SearchField({
   );
 }
 
-/** Outlined card around a table: a toolbar row on top, the table, then pagination. */
+/** Full-bleed panel around a table: a toolbar row on top, the table, then pagination. */
 export function DataCard({ toolbar, children }: { toolbar?: ReactNode; children: ReactNode }) {
   return (
-    <Paper variant="outlined" sx={{ overflow: "hidden" }}>
+    <Paper square elevation={0} sx={{ bgcolor: "transparent" }}>
       {toolbar && (
         <Stack
           direction="row"
           sx={{
-            p: 2,
+            px: 3,
+            py: 2,
             gap: 1.5,
             flexWrap: "wrap",
             alignItems: "center",

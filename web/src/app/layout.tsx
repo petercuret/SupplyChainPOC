@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Suspense fallback={<Box sx={{ width: { md: SIDEBAR_WIDTH }, flexShrink: 0 }} />}>
                 <Sidebar />
               </Suspense>
-              <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
+              <Box component="main" sx={{ flex: 1, minWidth: 0, bgcolor: "background.paper" }}>
                 {children}
               </Box>
             </Box>

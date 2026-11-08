@@ -9,6 +9,13 @@ import type { GraphNode } from "@/lib/types";
 export const VIEWS = ["toys", "suppliers", "factories", "incidents"] as const;
 export type View = (typeof VIEWS)[number];
 
+export const VIEW_TITLES: Record<View, string> = {
+  toys: "Toys",
+  suppliers: "Suppliers",
+  factories: "Factories",
+  incidents: "Incidents",
+};
+
 export function viewHref(finisherId: number | null, view: View): string {
   const params = new URLSearchParams({ view });
   if (finisherId !== null) params.set("finisher", String(finisherId));

@@ -44,7 +44,7 @@ export function Sidebar() {
       sx={{
         width: { md: SIDEBAR_WIDTH },
         flexShrink: 0,
-        bgcolor: "background.paper",
+        bgcolor: "background.default",
         // Full shorthand per breakpoint: a bare `1` would reset the color to currentColor.
         borderRight: { md: "1px solid var(--mui-palette-divider)" },
         borderBottom: { xs: "1px solid var(--mui-palette-divider)", md: "none" },

@@ -35,7 +35,12 @@ const theme = createTheme({
     MuiPaper: { styleOverrides: { outlined: { borderColor: "var(--mui-palette-divider)" } } },
     MuiTableCell: {
       styleOverrides: {
-        root: { borderColor: "var(--mui-palette-divider)" },
+        // Edge cells match the 24px gutter of the toolbars above full-width tables.
+        root: {
+          borderColor: "var(--mui-palette-divider)",
+          "&:first-of-type": { paddingLeft: 24 },
+          "&:last-of-type": { paddingRight: 24 },
+        },
         head: ({ theme }) => ({
           fontSize: "0.72rem",
           fontWeight: 700,

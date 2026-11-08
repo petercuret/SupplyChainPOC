@@ -62,12 +62,15 @@ export function ToyGraphView() {
         {toy && toyStyle && (
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <toyStyle.Icon titleAccess={toyStyle.label} sx={{ color: toyStyle.color }} />
-            <Typography variant="h6" component="h1">
-              {toy.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {toy.external_id}
-            </Typography>
+            {/* Name and id share a text baseline despite their different sizes. */}
+            <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
+              <Typography variant="h6" component="h1" sx={{ lineHeight: 1.2 }}>
+                {toy.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+                {toy.external_id}
+              </Typography>
+            </Stack>
           </Stack>
         )}
         <Tooltip title={worst ? "" : "This toy has no exposure paths"}>
