@@ -38,7 +38,7 @@ export function ToyDetail({ toyId, exposure }: { toyId: number; exposure?: Expos
             >
               <SeverityChip
                 severity={path.incident.severity}
-                label={`${formatType(path.incident.type)} · ${path.incident.severity}`}
+                label={formatType(path.incident.type)}
               />
               <Typography variant="body2">{path.steps.map(describeStep).join(" → ")}</Typography>
             </Stack>

@@ -90,6 +90,15 @@ class SupplierSummary(BaseModel):
     open_incidents: list[IncidentOut]
 
 
+class FactorySummary(BaseModel):
+    factory: NodeOut
+    supplier: NodeOut | None  # the operator
+    part_count: int  # parts made here (all customers)
+    toy_count: int  # this finisher's toys that depend on the factory
+    affected_toy_count: int  # of those, toys exposed through this factory
+    open_incidents: list[IncidentOut]
+
+
 class PathStep(BaseModel):
     node: NodeOut
     edge_kind: str | None = None  # edge from the previous step to this node
@@ -105,3 +114,20 @@ class ExposedToy(BaseModel):
     toy: NodeOut
     severity: Severity
     paths: list[ExposurePathOut]
+
+
+class EdgeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str
+    source_id: int
+    target_id: int
+    attrs: dict[str, Any]
+
+
+class GraphOut(BaseModel):
+    root_id: int
+    nodes: list[NodeOut]
+    edges: list[EdgeOut]
+    incidents: list[IncidentOut]  # open incidents on any node in the graph

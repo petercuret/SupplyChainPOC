@@ -1,22 +1,44 @@
+import ErrorOutline from "@mui/icons-material/ErrorOutlineOutlined";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
+import Report from "@mui/icons-material/Report";
+import WarningAmber from "@mui/icons-material/WarningAmber";
 import Chip, { type ChipProps } from "@mui/material/Chip";
+import type { SvgIconProps } from "@mui/material/SvgIcon";
+import Tooltip from "@mui/material/Tooltip";
 
 import type { Severity } from "@/lib/types";
 
-const COLORS: Record<Severity, ChipProps["color"]> = {
+export const SEVERITY_COLORS: Record<Severity, "info" | "warning" | "error"> = {
   low: "info",
   medium: "warning",
   high: "error",
   critical: "error",
 };
 
-export function SeverityChip({ severity, label }: { severity: Severity; label?: string }) {
+const ICONS = { low: InfoOutlined, medium: WarningAmber, high: ErrorOutline, critical: Report };
+
+export function SeverityIcon({ severity, ...props }: { severity: Severity } & SvgIconProps) {
+  const Icon = ICONS[severity];
   return (
-    <Chip
-      size="small"
-      color={COLORS[severity]}
-      variant={severity === "critical" ? "filled" : "outlined"}
-      label={label ?? severity}
-      sx={{ textTransform: label ? undefined : "capitalize" }}
-    />
+    <Icon color={SEVERITY_COLORS[severity]} titleAccess={`Severity: ${severity}`} {...props} />
+  );
+}
+
+type Props = { severity: Severity; label: string; onClick?: ChipProps["onClick"] };
+
+/** A badge whose icon and color show the severity; the label says what it is about. */
+export function SeverityChip({ severity, label, onClick }: Props) {
+  const Icon = ICONS[severity];
+  return (
+    <Tooltip title={`Severity: ${severity}${onClick ? " · click to edit" : ""}`}>
+      <Chip
+        size="small"
+        icon={<Icon />}
+        color={SEVERITY_COLORS[severity]}
+        variant={severity === "critical" ? "filled" : "outlined"}
+        label={label}
+        onClick={onClick}
+      />
+    </Tooltip>
   );
 }

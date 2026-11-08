@@ -139,3 +139,26 @@ def upstream_product_counts(owner_id: int) -> dict[int, int]:
     with connection.cursor() as cursor:
         cursor.execute(_REACHABLE_SQL, {"owner_id": owner_id, "kinds": SUPPLY_EDGES})
         return dict(cursor.fetchall())
+
+
+_DOWNSTREAM_SQL = """
+WITH RECURSIVE walk(node_id) AS (
+    SELECT %(root_id)s::bigint
+  UNION
+    SELECT e.target_id FROM walk w JOIN core_edge e ON e.source_id = w.node_id
+    WHERE e.kind = ANY(%(kinds)s)
+)
+SELECT node_id FROM walk
+"""
+
+
+def dependency_graph(root_id: int) -> tuple[list[Node], list[Edge]]:
+    """Everything `root_id` depends on (at any depth), with the edges between those nodes."""
+    with connection.cursor() as cursor:
+        cursor.execute(_DOWNSTREAM_SQL, {"root_id": root_id, "kinds": SUPPLY_EDGES})
+        node_ids = [row[0] for row in cursor.fetchall()]
+    nodes = list(Node.objects.filter(id__in=node_ids))
+    edges = list(
+        Edge.objects.filter(source_id__in=node_ids, target_id__in=node_ids, kind__in=SUPPLY_EDGES)
+    )
+    return nodes, edges

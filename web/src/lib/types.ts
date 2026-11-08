@@ -34,6 +34,15 @@ export type SupplierSummary = {
   open_incidents: Incident[];
 };
 
+export type FactorySummary = {
+  factory: GraphNode;
+  supplier: GraphNode | null;
+  part_count: number;
+  toy_count: number;
+  affected_toy_count: number;
+  open_incidents: Incident[];
+};
+
 export type BomLine = {
   part: GraphNode;
   quantity: number;
@@ -57,3 +66,18 @@ export function formatType(type: string): string {
   const text = type.replaceAll("_", " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+export type GraphEdge = {
+  id: number;
+  kind: string;
+  source_id: number;
+  target_id: number;
+  attrs: Record<string, number>;
+};
+
+export type GraphData = {
+  root_id: number;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  incidents: Incident[];
+};

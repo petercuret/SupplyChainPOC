@@ -59,11 +59,14 @@ test("marks exposed toys and explains the path through the parts", async () => {
     </SWRConfig>,
   );
 
-  expect(await screen.findByText("Exposed · critical")).toBeDefined();
+  expect(await screen.findByText("Exposed")).toBeDefined();
   expect(screen.getByText("Clear")).toBeDefined();
   expect(screen.getByText("Exposed (1)")).toBeDefined();
+  expect(screen.getByLabelText("Graph view of Comet Fort").getAttribute("href")).toBe(
+    "/toys/1/graph?finisher=7",
+  );
 
-  fireEvent.click(screen.getByText("Comet Fort"));
+  fireEvent.click(screen.getByLabelText("Expand Comet Fort"));
 
   expect(await screen.findByText("Comet Fort → wheel ×4 → Aequs Fabrication")).toBeDefined();
 });

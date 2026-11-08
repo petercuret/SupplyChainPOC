@@ -1,59 +1,43 @@
 "use client";
 
 import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
-import MenuItem from "@mui/material/MenuItem";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
-import TextField from "@mui/material/TextField";
-import { useState } from "react";
-import useSWR from "swr";
+import Typography from "@mui/material/Typography";
 
+import { FactoriesTable } from "@/components/FactoriesTable";
 import { IncidentsTable } from "@/components/IncidentsTable";
 import { SuppliersTable } from "@/components/SuppliersTable";
 import { ToysTable } from "@/components/ToysTable";
-import { fetcher } from "@/lib/api";
-import type { GraphNode } from "@/lib/types";
+import { useView } from "@/lib/view";
 
-type TabName = "toys" | "suppliers" | "incidents";
+const TITLES = {
+  toys: "Toys",
+  suppliers: "Suppliers",
+  factories: "Factories",
+  incidents: "Incidents",
+};
 
+/** The view selected in the sidebar (via the URL), for the selected finisher. */
 export function Dashboard() {
-  const { data: finishers, error, isLoading } = useSWR<GraphNode[]>("/api/finishers", fetcher);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [tab, setTab] = useState<TabName>("toys");
+  const { finishers, finisherId, view } = useView();
 
-  if (isLoading) return <CircularProgress aria-label="Loading" />;
-  if (error) return <Alert severity="error">Could not reach the API: {error.message}</Alert>;
-  if (!finishers?.length) {
+  if (finishers.isLoading) return <CircularProgress aria-label="Loading" />;
+  if (finishers.error) {
+    return <Alert severity="error">Could not reach the API: {finishers.error.message}</Alert>;
+  }
+  if (finisherId === null) {
     return <Alert severity="info">No data yet. Run `just api-seed` to import the CSVs.</Alert>;
   }
-  const finisherId = selected ?? finishers[0].id;
 
   return (
-    <Box>
-      <TextField
-        select
-        size="small"
-        label="Viewing as finisher"
-        value={finisherId}
-        onChange={(e) => setSelected(Number(e.target.value))}
-        sx={{ minWidth: 260, mb: 2 }}
-      >
-        {finishers.map((f) => (
-          <MenuItem key={f.id} value={f.id}>
-            {f.name} ({f.external_id})
-          </MenuItem>
-        ))}
-      </TextField>
-      <Tabs value={tab} onChange={(_, value: TabName) => setTab(value)} sx={{ mb: 2 }}>
-        <Tab value="toys" label="Toys" />
-        <Tab value="suppliers" label="Suppliers" />
-        <Tab value="incidents" label="Incidents" />
-      </Tabs>
-      {tab === "toys" && <ToysTable finisherId={finisherId} />}
-      {tab === "suppliers" && <SuppliersTable finisherId={finisherId} />}
-      {tab === "incidents" && <IncidentsTable />}
-    </Box>
+    <>
+      <Typography variant="h5" component="h1" gutterBottom>
+        {TITLES[view]}
+      </Typography>
+      {view === "toys" && <ToysTable key={finisherId} finisherId={finisherId} />}
+      {view === "suppliers" && <SuppliersTable key={finisherId} finisherId={finisherId} />}
+      {view === "factories" && <FactoriesTable key={finisherId} finisherId={finisherId} />}
+      {view === "incidents" && <IncidentsTable />}
+    </>
   );
 }

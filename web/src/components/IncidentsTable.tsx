@@ -4,11 +4,13 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
+import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
@@ -17,9 +19,10 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
 import { IncidentDialog } from "@/components/IncidentDialog";
-import { SeverityChip } from "@/components/SeverityChip";
+import { SeverityIcon } from "@/components/SeverityChip";
 import { allApiKeys, fetcher, send } from "@/lib/api";
 import { formatType, type Incident, type IncidentStatus, STATUSES } from "@/lib/types";
+import { usePagination } from "@/lib/usePagination";
 
 export function IncidentsTable() {
   const [status, setStatus] = useState<IncidentStatus | "all">("open");
@@ -29,6 +32,7 @@ export function IncidentsTable() {
   const [editing, setEditing] = useState<Incident | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { pageRows, paginationProps } = usePagination(data ?? []);
 
   async function act(request: () => Promise<unknown>) {
     setActionError(null);
@@ -66,7 +70,7 @@ export function IncidentsTable() {
       {error && <Alert severity="error">Could not load incidents: {error.message}</Alert>}
       {data?.length === 0 && (
         <Typography color="text.secondary">
-          No incidents. Flag a supplier from the Suppliers tab.
+          No incidents. Add one from the Suppliers or Factories view.
         </Typography>
       )}
       {!!data?.length && (
@@ -84,7 +88,7 @@ export function IncidentsTable() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {data.map((i) => (
+              {pageRows.map((i) => (
                 <TableRow key={i.id} hover>
                   <TableCell>{i.reported_at}</TableCell>
                   <TableCell>
@@ -95,7 +99,12 @@ export function IncidentsTable() {
                   </TableCell>
                   <TableCell>{formatType(i.type)}</TableCell>
                   <TableCell>
-                    <SeverityChip severity={i.severity} />
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                      <SeverityIcon severity={i.severity} fontSize="small" />
+                      <Typography variant="body2" sx={{ textTransform: "capitalize" }}>
+                        {i.severity}
+                      </Typography>
+                    </Stack>
                   </TableCell>
                   <TableCell sx={{ textTransform: "capitalize" }}>
                     {i.status}
@@ -142,6 +151,7 @@ export function IncidentsTable() {
           </Table>
         </TableContainer>
       )}
+      {!!data?.length && <TablePagination {...paginationProps} />}
       {editing && <IncidentDialog open incident={editing} onClose={() => setEditing(null)} />}
     </Box>
   );

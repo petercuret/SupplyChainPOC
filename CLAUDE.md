@@ -19,9 +19,11 @@ api/                  # Python 3.12, managed with uv
   tests/              # pytest, uses FastAPI TestClient
   docker-compose.yml  # Postgres 17 for local dev
 web/                  # Next.js 16 (App Router) + React 19 + TypeScript, managed with npm
-  src/app/            # Routes: layout.tsx (MUI providers + Header), page.tsx
+  src/app/            # layout.tsx (providers, Header, Sidebar), page.tsx (dashboard views),
+                      # toys/[toyId]/graph (React Flow supply-chain graph)
   src/components/     # UI components (MUI); *.test.tsx next to the component
-  src/lib/api.ts      # API_URL and the shared SWR `fetcher`
+  src/lib/api.ts      # API_URL, the shared SWR `fetcher`, `send` for mutations
+  src/lib/view.ts     # Selected finisher + view live in the URL (?finisher=&view=)
 ```
 
 ## Architecture
@@ -43,7 +45,8 @@ web/                  # Next.js 16 (App Router) + React 19 + TypeScript, managed
   `"use client"` component. `fetcher` prefixes `NEXT_PUBLIC_API_URL` and throws on non-2xx.
 - UI uses **Material UI** (`@mui/material`). Import components by path (`@mui/material/Button`).
   Theme lives in `src/components/Providers.tsx`. Use MUI components and `sx` styling, not custom CSS.
-- Next.js `cacheComponents` is enabled. This Next.js version may differ from what you know:
+- Next.js `cacheComponents` is enabled: client components using `useSearchParams`/`useParams`
+  must sit inside `<Suspense>` (check with `npm run build`). This Next.js version may differ from what you know:
   read `web/AGENTS.md` and `web/node_modules/next/dist/docs/` before using unfamiliar Next APIs.
 
 ## Commands
