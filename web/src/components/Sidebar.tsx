@@ -14,6 +14,7 @@ import type { SvgIconComponent } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { tint } from "@/lib/format";
 import { SIDEBAR_WIDTH } from "@/lib/layout";
 import { ROLE_STYLES } from "@/lib/nodeStyles";
 import { type View, viewHref, useView } from "@/lib/view";
@@ -80,7 +81,7 @@ export function Sidebar() {
                 borderRadius: 2,
                 py: 0.75,
                 "&.Mui-selected, &.Mui-selected:hover": {
-                  bgcolor: `color-mix(in srgb, ${color} 12%, transparent)`,
+                  bgcolor: tint(color, 12),
                 },
               }}
             >
@@ -92,7 +93,7 @@ export function Sidebar() {
                     width: 28,
                     height: 28,
                     borderRadius: 1.5,
-                    bgcolor: `color-mix(in srgb, ${color} ${selected ? 100 : 14}%, transparent)`,
+                    bgcolor: tint(color, selected ? 100 : 14),
                     color: selected ? "#fff" : color,
                   }}
                 >

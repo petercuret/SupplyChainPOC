@@ -18,8 +18,6 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
@@ -27,8 +25,10 @@ import useSWR, { useSWRConfig } from "swr";
 
 import { IncidentDialog } from "@/components/IncidentDialog";
 import { SeverityIcon } from "@/components/SeverityChip";
-import { DataCard, EmptyRow, matches, NodeLabel, SearchField } from "@/components/ui";
+import { NodeLabel } from "@/components/NodeLabel";
+import { DataCard, EmptyRow, FilterToggle, SearchField } from "@/components/ui";
 import { allApiKeys, fetcher, send } from "@/lib/api";
+import { matches } from "@/lib/format";
 import { styleFor } from "@/lib/nodeStyles";
 import { formatType, type Incident, type IncidentStatus, STATUSES } from "@/lib/types";
 import { usePagination } from "@/lib/usePagination";
@@ -73,7 +73,7 @@ export function IncidentsTable() {
   const rows = (data ?? []).filter((i) =>
     matches(query, i.node.name, i.node.external_id, formatType(i.type), i.description),
   );
-  const { pageRows, paginationProps } = usePagination(rows);
+  const { pageRows, paginationProps } = usePagination(rows, `${status}|${query}`);
 
   async function act(request: () => Promise<unknown>) {
     setActionError(null);
@@ -97,18 +97,14 @@ export function IncidentsTable() {
             placeholder="Search by flagged node, incident type or description"
             width={500}
           />
-          <ToggleButtonGroup
-            size="small"
-            exclusive
+          <FilterToggle
             value={status}
-            onChange={(_, value) => value && setStatus(value)}
-          >
-            {[...STATUSES, "all" as const].map((s) => (
-              <ToggleButton key={s} value={s} sx={{ textTransform: "capitalize" }}>
-                {s}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+            onChange={setStatus}
+            options={[...STATUSES, "all" as const].map((s) => ({
+              value: s,
+              label: s.charAt(0).toUpperCase() + s.slice(1),
+            }))}
+          />
         </>
       }
     >

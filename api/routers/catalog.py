@@ -1,11 +1,18 @@
 from collections import defaultdict
+from dataclasses import dataclass
 
 from django.db.models import Count, Q
 from fastapi import APIRouter
 
-from core.graph import Exposure, dependency_graph, find_exposure, upstream_product_counts
-from core.models import Edge, Incident, Node
-from routers.common import get_or_404
+from core.graph import (
+    dependency_graph,
+    find_exposure,
+    open_incidents_by_node,
+    operators,
+    upstream_product_counts,
+)
+from core.models import Edge, Node
+from routers.common import finisher_or_404, get_or_404, path_steps
 from schemas import (
     BomLine,
     EdgeOut,
@@ -16,34 +23,12 @@ from schemas import (
     IncidentOut,
     NodeOut,
     PartSource,
-    PathStep,
     Severity,
     SupplierSummary,
     ToySummary,
 )
 
 router = APIRouter(prefix="/api", tags=["catalog"])
-
-
-def finisher_or_404(finisher_id: int) -> Node:
-    return get_or_404(Node, id=finisher_id, kind=Node.Kind.ORGANIZATION, role="finisher")
-
-
-def _exposed_toy(exposure: Exposure) -> ExposedToy:
-    paths = [
-        ExposurePathOut(
-            incident=IncidentOut.model_validate(p.incident),
-            steps=[PathStep(node=NodeOut.model_validate(p.nodes[0]))]
-            + [
-                PathStep(node=NodeOut.model_validate(n), edge_kind=e.kind, edge_attrs=e.attrs)
-                for n, e in zip(p.nodes[1:], p.edges, strict=True)
-            ],
-        )
-        for p in exposure.paths
-    ]
-    return ExposedToy(
-        toy=NodeOut.model_validate(exposure.product), severity=exposure.severity, paths=paths
-    )
 
 
 @router.get("/finishers")
@@ -69,9 +54,41 @@ def list_toys(finisher_id: int) -> list[ToySummary]:
     ]
 
 
-def _upstream(finisher: Node, kind: str, count_edge: str) -> tuple[list[Node], dict, dict, dict]:
-    """Nodes of `kind` the finisher's toys depend on, annotated with how many `count_edge` edges
-    point at them, plus per node: toys using it, toys exposed through it, open incidents."""
+@router.get("/finishers/{finisher_id}/exposure")
+def list_exposure(
+    finisher_id: int, type: str | None = None, min_severity: Severity | None = None
+) -> list[ExposedToy]:
+    finisher = finisher_or_404(finisher_id)
+    exposures = find_exposure(finisher.id, incident_type=type, min_severity=min_severity)
+    return [
+        ExposedToy(
+            toy=NodeOut.model_validate(e.product),
+            severity=e.severity,
+            paths=[
+                ExposurePathOut(
+                    incident=IncidentOut.model_validate(p.incident),
+                    steps=path_steps(p.nodes, p.edges),
+                )
+                for p in e.paths
+            ],
+        )
+        for e in sorted(exposures, key=lambda e: e.product.name)
+    ]
+
+
+@dataclass
+class _Upstream:
+    """A node the finisher's toys depend on, with the numbers shown in the list views."""
+
+    node: Node
+    toy_count: int  # finisher's toys that depend on it
+    affected_toy_count: int  # of those, toys with an exposure path through it
+    open_incidents: list[IncidentOut]
+
+
+def _upstream(finisher: Node, kind: str, count_edge: str) -> list[_Upstream]:
+    """Nodes of `kind` the finisher's toys depend on. Each node gets `edge_count`: how many
+    `count_edge` edges point at it (factories per supplier, parts per factory)."""
     toy_counts = upstream_product_counts(finisher.id)
     # A toy is affected through a node when one of its exposure paths passes that node, so a
     # factory counts toys exposed by an incident on the factory itself or on its operator.
@@ -83,76 +100,80 @@ def _upstream(finisher: Node, kind: str, count_edge: str) -> tuple[list[Node], d
 
     nodes = list(
         Node.objects.filter(id__in=toy_counts, kind=kind)
-        .exclude(id=finisher.id)
         .annotate(edge_count=Count("in_edges", filter=Q(in_edges__kind=count_edge)))
         .order_by("name")
     )
-    incidents: dict[int, list[IncidentOut]] = defaultdict(list)
-    for i in Incident.objects.filter(node__in=nodes, status=Incident.Status.OPEN).select_related(
-        "node"
-    ):
-        incidents[i.node_id].append(IncidentOut.model_validate(i))
-    return nodes, toy_counts, affected, incidents
+    incidents = open_incidents_by_node(nodes)
+    return [
+        _Upstream(
+            node=n,
+            toy_count=toy_counts[n.id],
+            affected_toy_count=len(affected[n.id]),
+            open_incidents=[IncidentOut.model_validate(i) for i in incidents.get(n.id, [])],
+        )
+        for n in nodes
+    ]
 
 
 @router.get("/finishers/{finisher_id}/suppliers")
 def list_suppliers(finisher_id: int) -> list[SupplierSummary]:
-    nodes, toy_counts, affected, incidents = _upstream(
+    upstream = _upstream(
         finisher_or_404(finisher_id), Node.Kind.ORGANIZATION, Edge.Kind.OPERATED_BY
     )
     return [
         SupplierSummary(
-            supplier=NodeOut.model_validate(s),
-            factory_count=s.edge_count,
-            toy_count=toy_counts[s.id],
-            affected_toy_count=len(affected[s.id]),
-            open_incidents=incidents[s.id],
+            supplier=NodeOut.model_validate(u.node),
+            factory_count=u.node.edge_count,
+            toy_count=u.toy_count,
+            affected_toy_count=u.affected_toy_count,
+            open_incidents=u.open_incidents,
         )
-        for s in nodes
+        for u in upstream
     ]
 
 
 @router.get("/finishers/{finisher_id}/factories")
 def list_factories(finisher_id: int) -> list[FactorySummary]:
-    nodes, toy_counts, affected, incidents = _upstream(
-        finisher_or_404(finisher_id), Node.Kind.FACILITY, Edge.Kind.MADE_AT
-    )
-    operators = {
-        e.source_id: e.target
-        for e in Edge.objects.filter(kind=Edge.Kind.OPERATED_BY, source__in=nodes).select_related(
-            "target"
-        )
-    }
+    upstream = _upstream(finisher_or_404(finisher_id), Node.Kind.FACILITY, Edge.Kind.MADE_AT)
+    operator = operators(u.node for u in upstream)
     return [
         FactorySummary(
-            factory=NodeOut.model_validate(f),
-            supplier=NodeOut.model_validate(operators[f.id]) if f.id in operators else None,
-            part_count=f.edge_count,
-            toy_count=toy_counts[f.id],
-            affected_toy_count=len(affected[f.id]),
-            open_incidents=incidents[f.id],
+            factory=NodeOut.model_validate(u.node),
+            supplier=NodeOut.model_validate(operator[u.node.id]) if u.node.id in operator else None,
+            part_count=u.node.edge_count,
+            toy_count=u.toy_count,
+            affected_toy_count=u.affected_toy_count,
+            open_incidents=u.open_incidents,
         )
-        for f in nodes
+        for u in upstream
     ]
 
 
-@router.get("/finishers/{finisher_id}/exposure")
-def list_exposure(
-    finisher_id: int, type: str | None = None, min_severity: Severity | None = None
-) -> list[ExposedToy]:
-    finisher = finisher_or_404(finisher_id)
-    exposures = find_exposure(finisher.id, incident_type=type, min_severity=min_severity)
-    exposures.sort(key=lambda e: e.product.name)
-    return [_exposed_toy(e) for e in exposures]
+def part_sources(parts: list[Node]) -> dict[int, list[PartSource]]:
+    """Each part's factories (made_at) with the supplier operating each one."""
+    made_at = list(
+        Edge.objects.filter(kind=Edge.Kind.MADE_AT, source__in=parts).select_related("target")
+    )
+    operator = operators(e.target_id for e in made_at)
+    sources: dict[int, list[PartSource]] = defaultdict(list)
+    for e in made_at:
+        supplier = operator.get(e.target_id)
+        sources[e.source_id].append(
+            PartSource(
+                factory=NodeOut.model_validate(e.target),
+                supplier=NodeOut.model_validate(supplier) if supplier else None,
+                unit_cost_usd=e.attrs.get("unit_cost_usd"),
+            )
+        )
+    return sources
 
 
 @router.get("/toys/{toy_id}/parts")
 def list_toy_parts(toy_id: int) -> list[BomLine]:
     """One level of the BOM, with each part's factories and their operators."""
     toy = get_or_404(Node, id=toy_id, role="product")
-    contains = toy.out_edges.filter(kind=Edge.Kind.CONTAINS).select_related("target")
-    parts = [e.target for e in contains]
-    sources = part_sources(parts)
+    contains = list(toy.out_edges.filter(kind=Edge.Kind.CONTAINS).select_related("target"))
+    sources = part_sources([e.target for e in contains])
     lines = [
         BomLine(
             part=NodeOut.model_validate(e.target),
@@ -164,39 +185,15 @@ def list_toy_parts(toy_id: int) -> list[BomLine]:
     return sorted(lines, key=lambda line: line.part.name)
 
 
-def part_sources(parts: list[Node]) -> dict[int, list[PartSource]]:
-    """Each part's factories (made_at) with the supplier operating each one."""
-    made_at = Edge.objects.filter(kind=Edge.Kind.MADE_AT, source__in=parts).select_related("target")
-    operators = {
-        e.source_id: e.target
-        for e in Edge.objects.filter(
-            kind=Edge.Kind.OPERATED_BY, source__in=[e.target_id for e in made_at]
-        ).select_related("target")
-    }
-    sources: dict[int, list[PartSource]] = defaultdict(list)
-    for e in made_at:
-        operator = operators.get(e.target_id)
-        sources[e.source_id].append(
-            PartSource(
-                factory=NodeOut.model_validate(e.target),
-                supplier=NodeOut.model_validate(operator) if operator else None,
-                unit_cost_usd=e.attrs.get("unit_cost_usd"),
-            )
-        )
-    return sources
-
-
 @router.get("/nodes/{node_id}/graph")
 def node_graph(node_id: int) -> GraphOut:
     """The node and everything it depends on, for the graph view."""
     root = get_or_404(Node, id=node_id)
     nodes, edges = dependency_graph(root.id)
-    incidents = Incident.objects.filter(node__in=nodes, status=Incident.Status.OPEN).select_related(
-        "node"
-    )
+    incidents = open_incidents_by_node(nodes)
     return GraphOut(
         root_id=root.id,
         nodes=[NodeOut.model_validate(n) for n in nodes],
         edges=[EdgeOut.model_validate(e) for e in edges],
-        incidents=[IncidentOut.model_validate(i) for i in incidents],
+        incidents=[IncidentOut.model_validate(i) for group in incidents.values() for i in group],
     )

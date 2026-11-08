@@ -10,6 +10,11 @@ export type GraphNode = {
 export const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
+/** 0 for no severity, then 1 (low) to 4 (critical), for sorting. */
+export function severityRank(severity: Severity | null | undefined): number {
+  return severity ? SEVERITIES.indexOf(severity) + 1 : 0;
+}
+
 export const STATUSES = ["open", "resolved", "dismissed"] as const;
 export type IncidentStatus = (typeof STATUSES)[number];
 
@@ -43,11 +48,13 @@ export type FactorySummary = {
   open_incidents: Incident[];
 };
 
-export type BomLine = {
-  part: GraphNode;
-  quantity: number;
-  sources: { factory: GraphNode; supplier: GraphNode | null; unit_cost_usd: number | null }[];
+export type PartSource = {
+  factory: GraphNode;
+  supplier: GraphNode | null;
+  unit_cost_usd: number | null;
 };
+
+export type BomLine = { part: GraphNode; quantity: number; sources: PartSource[] };
 
 export type PathStep = {
   node: GraphNode;
@@ -84,7 +91,7 @@ export type GraphData = {
 
 export type PartSummary = {
   part: GraphNode;
-  sources: BomLine["sources"];
+  sources: PartSource[];
   toy_count: number;
   severity: Severity | null;
   incident_count: number;

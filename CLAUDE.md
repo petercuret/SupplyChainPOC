@@ -23,8 +23,10 @@ web/                  # Next.js 16 (App Router) + React 19 + TypeScript, managed
   src/app/            # layout.tsx (providers, Header, Sidebar), page.tsx (dashboard views),
                       # toys/[toyId]/graph (React Flow supply-chain graph)
   src/components/     # UI components (MUI); *.test.tsx next to the component
+                      # ui.tsx: generic table/list building blocks; NodeLabel.tsx: nodes and paths
   src/lib/api.ts      # API_URL, the shared SWR `fetcher`, `send` for mutations
   src/lib/view.ts     # Selected finisher + view live in the URL (?finisher=&view=)
+  src/lib/format.ts   # Pure display helpers (search matching, site names, color tints)
 ```
 
 ## Architecture
@@ -40,7 +42,7 @@ web/                  # Next.js 16 (App Router) + React 19 + TypeScript, managed
   `config.django` must be imported before any Django model, which is why it is the first import in `main.py`.
 - Django ORM calls are synchronous. Use plain `def` endpoints (FastAPI runs them in a threadpool), or
   `asgiref.sync.sync_to_async` / Django's async ORM methods (`aget`, `acreate`, ...) in `async def` ones.
-- API routes are prefixed with `/api`. Responses are typed with Pydantic models (see `HelloResponse`).
+- API routes are prefixed with `/api`. Responses are typed with Pydantic models (in `schemas.py`).
 - CORS origins come from `CORS_ORIGINS` in `api/.env` (default `http://localhost:3000`).
 - The web app fetches data client-side with **SWR**: `useSWR("/api/<path>", fetcher)` inside a
   `"use client"` component. `fetcher` prefixes `NEXT_PUBLIC_API_URL` and throws on non-2xx.

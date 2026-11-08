@@ -1,7 +1,5 @@
 "use client";
 
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -9,30 +7,27 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { useState } from "react";
 import useSWR from "swr";
 
-import { AffectedCount } from "@/components/AffectedCount";
 import { IncidentBadges } from "@/components/IncidentBadges";
-import { DataCard, EmptyRow, matches, NodeLabel, SearchField } from "@/components/ui";
+import { NodeLabel } from "@/components/NodeLabel";
+import { Count, DataCard, EmptyRow, FilterToggle, loadState, SearchField } from "@/components/ui";
 import { fetcher } from "@/lib/api";
+import { matches } from "@/lib/format";
 import type { SupplierSummary } from "@/lib/types";
 import { usePagination } from "@/lib/usePagination";
 
 const COLUMNS = 6;
 
 export function SuppliersTable({ finisherId }: { finisherId: number }) {
-  const { data, error, isLoading } = useSWR<SupplierSummary[]>(
-    `/api/finishers/${finisherId}/suppliers`,
-    fetcher,
-  );
+  const suppliers = useSWR<SupplierSummary[]>(`/api/finishers/${finisherId}/suppliers`, fetcher);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "affected">("all");
 
-  const all = data ?? [];
+  const all = suppliers.data ?? [];
   const affected = all.filter((s) => s.affected_toy_count || s.open_incidents.length);
+  // Most affected toys first, so the suppliers that need attention are on page one.
   const rows = (filter === "affected" ? affected : all)
     .filter((s) =>
       matches(query, s.supplier.name, s.supplier.external_id, s.supplier.attrs.hq_country),
@@ -42,10 +37,10 @@ export function SuppliersTable({ finisherId }: { finisherId: number }) {
         b.affected_toy_count - a.affected_toy_count ||
         a.supplier.name.localeCompare(b.supplier.name),
     );
-  const { pageRows, paginationProps } = usePagination(rows);
+  const { pageRows, paginationProps } = usePagination(rows, `${filter}|${query}`);
 
-  if (isLoading) return <CircularProgress aria-label="Loading" />;
-  if (error) return <Alert severity="error">Could not load suppliers: {error.message}</Alert>;
+  const status = loadState(suppliers, "suppliers");
+  if (status) return status;
 
   return (
     <DataCard
@@ -56,15 +51,14 @@ export function SuppliersTable({ finisherId }: { finisherId: number }) {
             onChange={setQuery}
             placeholder="Search by supplier name, ID or HQ country"
           />
-          <ToggleButtonGroup
-            size="small"
-            exclusive
+          <FilterToggle
             value={filter}
-            onChange={(_, value) => value && setFilter(value)}
-          >
-            <ToggleButton value="all">All ({all.length})</ToggleButton>
-            <ToggleButton value="affected">Affected ({affected.length})</ToggleButton>
-          </ToggleButtonGroup>
+            onChange={setFilter}
+            options={[
+              { value: "all", label: "All", count: all.length },
+              { value: "affected", label: "Affected", count: affected.length },
+            ]}
+          />
         </>
       }
     >
@@ -91,7 +85,11 @@ export function SuppliersTable({ finisherId }: { finisherId: number }) {
                 <TableCell align="right">{s.factory_count}</TableCell>
                 <TableCell align="right">{s.toy_count}</TableCell>
                 <TableCell align="right">
-                  <AffectedCount affected={s.affected_toy_count} total={s.toy_count} />
+                  <Count
+                    value={s.affected_toy_count}
+                    tone="error"
+                    emphasize={s.affected_toy_count === s.toy_count}
+                  />
                 </TableCell>
                 <TableCell>
                   <IncidentBadges node={s.supplier} incidents={s.open_incidents} />

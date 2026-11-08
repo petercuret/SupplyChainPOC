@@ -1,7 +1,5 @@
 "use client";
 
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -9,38 +7,27 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { useState } from "react";
 import useSWR from "swr";
 
-import { AffectedCount } from "@/components/AffectedCount";
 import { IncidentBadges } from "@/components/IncidentBadges";
-import {
-  DataCard,
-  EmptyRow,
-  LocationLabel,
-  matches,
-  NodeLabel,
-  SearchField,
-  siteName,
-} from "@/components/ui";
+import { LocationLabel, NodeLabel } from "@/components/NodeLabel";
+import { Count, DataCard, EmptyRow, FilterToggle, loadState, SearchField } from "@/components/ui";
 import { fetcher } from "@/lib/api";
+import { matches, siteName } from "@/lib/format";
 import type { FactorySummary } from "@/lib/types";
 import { usePagination } from "@/lib/usePagination";
 
 const COLUMNS = 7;
 
 export function FactoriesTable({ finisherId }: { finisherId: number }) {
-  const { data, error, isLoading } = useSWR<FactorySummary[]>(
-    `/api/finishers/${finisherId}/factories`,
-    fetcher,
-  );
+  const factories = useSWR<FactorySummary[]>(`/api/finishers/${finisherId}/factories`, fetcher);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "affected">("all");
 
-  const all = data ?? [];
+  const all = factories.data ?? [];
   const affected = all.filter((f) => f.affected_toy_count || f.open_incidents.length);
+  // Most affected toys first, so the factories that need attention are on page one.
   const rows = (filter === "affected" ? affected : all)
     .filter((f) =>
       matches(
@@ -56,10 +43,10 @@ export function FactoriesTable({ finisherId }: { finisherId: number }) {
       (a, b) =>
         b.affected_toy_count - a.affected_toy_count || a.factory.name.localeCompare(b.factory.name),
     );
-  const { pageRows, paginationProps } = usePagination(rows);
+  const { pageRows, paginationProps } = usePagination(rows, `${filter}|${query}`);
 
-  if (isLoading) return <CircularProgress aria-label="Loading" />;
-  if (error) return <Alert severity="error">Could not load factories: {error.message}</Alert>;
+  const status = loadState(factories, "factories");
+  if (status) return status;
 
   return (
     <DataCard
@@ -70,15 +57,14 @@ export function FactoriesTable({ finisherId }: { finisherId: number }) {
             onChange={setQuery}
             placeholder="Search by factory, ID, city, country or supplier"
           />
-          <ToggleButtonGroup
-            size="small"
-            exclusive
+          <FilterToggle
             value={filter}
-            onChange={(_, value) => value && setFilter(value)}
-          >
-            <ToggleButton value="all">All ({all.length})</ToggleButton>
-            <ToggleButton value="affected">Affected ({affected.length})</ToggleButton>
-          </ToggleButtonGroup>
+            onChange={setFilter}
+            options={[
+              { value: "all", label: "All", count: all.length },
+              { value: "affected", label: "Affected", count: affected.length },
+            ]}
+          />
         </>
       }
     >
@@ -110,7 +96,11 @@ export function FactoriesTable({ finisherId }: { finisherId: number }) {
                 <TableCell align="right">{f.part_count}</TableCell>
                 <TableCell align="right">{f.toy_count}</TableCell>
                 <TableCell align="right">
-                  <AffectedCount affected={f.affected_toy_count} total={f.toy_count} />
+                  <Count
+                    value={f.affected_toy_count}
+                    tone="error"
+                    emphasize={f.affected_toy_count === f.toy_count}
+                  />
                 </TableCell>
                 <TableCell>
                   <IncidentBadges node={f.factory} incidents={f.open_incidents} />

@@ -1,87 +1,45 @@
 "use client";
 
-import ArrowForward from "@mui/icons-material/ArrowForward";
-import Place from "@mui/icons-material/PlaceOutlined";
+/** Generic building blocks shared by the list views (no supply-chain specifics). */
+
+import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
 import Search from "@mui/icons-material/Search";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Collapse from "@mui/material/Collapse";
+import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
-import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
-import Chip from "@mui/material/Chip";
 import { Fragment, type ReactNode } from "react";
 
-import { styleFor } from "@/lib/nodeStyles";
-import type { GraphNode, PathStep } from "@/lib/types";
-
-/** A node's name with its type icon in the type's color, and optionally its external id. */
-export function NodeLabel({
-  node,
-  showId = false,
-  name,
-}: {
-  node: GraphNode;
-  showId?: boolean;
-  name?: string; // shorter display name, e.g. from `siteName`
-}) {
-  const { color, Icon, label } = styleFor(node);
+/** Full-bleed panel around a table: a toolbar row on top, the table, then pagination. */
+export function DataCard({ toolbar, children }: { toolbar?: ReactNode; children: ReactNode }) {
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
-      <Icon titleAccess={label} sx={{ fontSize: 18, color, flexShrink: 0 }} />
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }} title={node.name}>
-          {name ?? node.name}
-        </Typography>
-        {showId && (
-          <Typography variant="caption" color="text.secondary" component="div" noWrap>
-            {node.external_id}
-          </Typography>
-        )}
-      </Box>
-    </Stack>
-  );
-}
-
-/** A place (city, country) with a pin icon, laid out like `NodeLabel` so they align in tables. */
-export function LocationLabel({ text }: { text: string }) {
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
-      <Place sx={{ fontSize: 18, color: "text.secondary", flexShrink: 0 }} />
-      <Typography variant="body2" noWrap>
-        {text}
-      </Typography>
-    </Stack>
-  );
-}
-
-export function PathArrow() {
-  return <ArrowForward sx={{ fontSize: 16, color: "text.disabled", flexShrink: 0 }} />;
-}
-
-/**
- * A chain of nodes joined by arrows (part ×6 → site → supplier). Factory names drop the name of
- * the supplier that follows them, and contains-edges show their quantity.
- */
-export function PathChain({ steps }: { steps: PathStep[] }) {
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-      {steps.map((step, j) => {
-        const next = steps[j + 1];
-        const operator = next?.edge_kind === "operated_by" ? next.node : null;
-        return (
-          <Fragment key={step.node.id}>
-            {j > 0 && <PathArrow />}
-            <NodeLabel node={step.node} name={siteName(step.node, operator)} />
-            {step.edge_attrs.quantity !== undefined && (
-              <Chip size="small" label={`×${step.edge_attrs.quantity}`} />
-            )}
-          </Fragment>
-        );
-      })}
-    </Stack>
+    <Box>
+      {toolbar && (
+        <Stack
+          direction="row"
+          sx={{
+            px: 3,
+            py: 2,
+            gap: 1.5,
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          {toolbar}
+        </Stack>
+      )}
+      {children}
+    </Box>
   );
 }
 
@@ -117,27 +75,30 @@ export function SearchField({
   );
 }
 
-/** Full-bleed panel around a table: a toolbar row on top, the table, then pagination. */
-export function DataCard({ toolbar, children }: { toolbar?: ReactNode; children: ReactNode }) {
+/** Mutually exclusive filter buttons, e.g. All (42) / Exposed (27). */
+export function FilterToggle<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string; count?: number }[];
+}) {
   return (
-    <Paper square elevation={0} sx={{ bgcolor: "transparent" }}>
-      {toolbar && (
-        <Stack
-          direction="row"
-          sx={{
-            px: 3,
-            py: 2,
-            gap: 1.5,
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          {toolbar}
-        </Stack>
-      )}
-      {children}
-    </Paper>
+    <ToggleButtonGroup
+      size="small"
+      exclusive
+      value={value}
+      onChange={(_, next: T | null) => next && onChange(next)}
+    >
+      {options.map((o) => (
+        <ToggleButton key={o.value} value={o.value}>
+          {o.label}
+          {o.count !== undefined && ` (${o.count})`}
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
   );
 }
 
@@ -153,24 +114,121 @@ export function EmptyRow({ colSpan, children }: { colSpan: number; children: Rea
   );
 }
 
-export function matches(query: string, ...fields: (string | number | undefined | null)[]) {
-  const q = query.trim().toLowerCase();
+/**
+ * A table row with an expand/collapse button in its first cell and a full-width detail row
+ * underneath. The detail is only mounted while open.
+ */
+export function ExpandableRow({
+  label,
+  open,
+  onToggle,
+  colSpan,
+  cells,
+  children,
+}: {
+  label: string; // what the row is, for the button's accessible name
+  open: boolean;
+  onToggle: () => void;
+  colSpan: number; // total columns, including the expand button
+  cells: ReactNode; // the remaining <TableCell>s of the main row
+  children: ReactNode; // the detail
+}) {
   return (
-    !q ||
-    fields.some((f) =>
-      String(f ?? "")
-        .toLowerCase()
-        .includes(q),
-    )
+    <Fragment>
+      <TableRow
+        hover
+        selected={open}
+        sx={{ "& > td": { borderBottom: open ? "unset" : undefined } }}
+      >
+        <TableCell padding="checkbox">
+          <IconButton
+            size="small"
+            aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+            aria-expanded={open}
+            onClick={onToggle}
+          >
+            <KeyboardArrowDown
+              sx={{ transition: "transform 150ms", transform: open ? "rotate(180deg)" : "none" }}
+            />
+          </IconButton>
+        </TableCell>
+        {cells}
+      </TableRow>
+      <TableRow>
+        <TableCell colSpan={colSpan} sx={{ py: 0, ...(!open && { border: 0 }) }}>
+          <Collapse in={open} unmountOnExit>
+            <Box sx={{ py: 2 }}>{children}</Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </Fragment>
+  );
+}
+
+export function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Box>
+      <Typography variant="subtitle2" gutterBottom>
+        {title}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+/** A number for a table cell: "–" when zero; red (bold when `emphasize`) for `tone="error"`. */
+export function Count({
+  value,
+  tone,
+  emphasize = false,
+}: {
+  value: number;
+  tone?: "error";
+  emphasize?: boolean;
+}) {
+  if (!value) {
+    return (
+      <Typography variant="body2" color="text.disabled" component="span">
+        –
+      </Typography>
+    );
+  }
+  return (
+    <Typography
+      variant="body2"
+      component="span"
+      color={tone}
+      sx={{ fontWeight: tone ? (emphasize ? 700 : 600) : undefined }}
+    >
+      {value}
+    </Typography>
   );
 }
 
 /**
- * A factory's name without its operator's name, when it repeats it:
- * "Aequs Fabrication — Tijuana Plant" operated by "Aequs Fabrication" -> "Tijuana Plant".
+ * The spinner or error to show for an SWR request, or null once it has data:
+ * `const status = loadState(toys, "toys"); if (status) return status;`
  */
-export function siteName(factory: GraphNode, operator?: GraphNode | null): string {
-  if (!operator || !factory.name.startsWith(operator.name)) return factory.name;
-  const rest = factory.name.slice(operator.name.length).match(/^\s*[—–-]\s*(.+)$/);
-  return rest?.[1] ?? factory.name;
+export function loadState(
+  request: { isLoading: boolean; error?: Error },
+  what: string,
+  compact = false,
+): ReactNode | null {
+  if (request.isLoading) {
+    return (
+      <CircularProgress
+        size={compact ? 20 : 40}
+        aria-label={`Loading ${what}`}
+        sx={{ m: compact ? 0 : 3 }}
+      />
+    );
+  }
+  if (request.error) {
+    return (
+      <Alert severity="error" sx={{ m: compact ? 0 : 3 }}>
+        Could not load {what}: {request.error.message}
+      </Alert>
+    );
+  }
+  return null;
 }

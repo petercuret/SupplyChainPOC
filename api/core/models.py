@@ -6,6 +6,8 @@ the dependent to its dependency (toy -> part -> factory -> supplier), so exposur
 traversal from a flagged node. Incidents can be attached to any node.
 """
 
+from collections.abc import Iterable
+
 from django.db import models
 
 
@@ -89,3 +91,8 @@ class Incident(models.Model):
 
 
 SEVERITY_RANK = {s: i for i, s in enumerate(Incident.Severity.values, start=1)}
+
+
+def worst_severity(severities: Iterable[str]) -> str | None:
+    """The most severe of `severities` (low < medium < high < critical), or None if empty."""
+    return max(severities, key=SEVERITY_RANK.__getitem__, default=None)

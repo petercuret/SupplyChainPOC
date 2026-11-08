@@ -16,7 +16,7 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
 import { SeverityIcon } from "@/components/SeverityChip";
-import { NodeLabel } from "@/components/ui";
+import { NodeLabel } from "@/components/NodeLabel";
 import { allApiKeys, fetcher, send } from "@/lib/api";
 import {
   formatType,

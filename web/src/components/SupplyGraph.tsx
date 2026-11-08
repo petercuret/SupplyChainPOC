@@ -28,7 +28,7 @@ import {
 import { useMemo } from "react";
 
 import { SeverityChip } from "@/components/SeverityChip";
-import { siteName } from "@/components/ui";
+import { siteName } from "@/lib/format";
 import { layoutLayers, nodesReaching } from "@/lib/graphLayout";
 import { ROLE_STYLES, styleFor } from "@/lib/nodeStyles";
 import { formatType, type GraphData, type GraphNode, type Incident } from "@/lib/types";
