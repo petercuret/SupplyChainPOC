@@ -1,9 +1,12 @@
+"use client";
+
 import VerifiedUser from "@mui/icons-material/VerifiedUser";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -20,7 +23,12 @@ export function Header() {
       <Toolbar disableGutters sx={{ minHeight: { xs: 64 }, pr: 3 }}>
         {/* Brand sits above the sidebar, so the breadcrumb starts where the content does. */}
         <Box
+          component={Link}
+          href="/"
+          aria-label="FairToy home"
           sx={{
+            color: "inherit",
+            textDecoration: "none",
             width: { md: SIDEBAR_WIDTH },
             flexShrink: 0,
             display: "flex",
