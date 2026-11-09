@@ -62,4 +62,4 @@ Press `Ctrl+C` to stop. Postgres keeps running in the background; stop it with `
 ## Configuration
 
 - `api/.env`: database credentials and allowed CORS origins (created from `api/.env.example`).
-- `web/.env.local`: `NEXT_PUBLIC_API_URL`, the API's address (created from `web/.env.example`).
+- `web/.env.local`: `NEXT_PUBLIC_API_URL`, the API's address (created from `web/.env.example`). az

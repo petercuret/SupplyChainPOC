@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from core.graph import InvalidEdge, create_edge, find_exposure
+from core.graph import InvalidEdge, InvalidNode, create_edge, find_exposure, validate_node
 from core.importer import import_seed
 from core.models import Edge, Incident, Node
 
@@ -37,6 +37,14 @@ def test_only_open_incidents_and_own_products_count(chain: dict[str, Node]) -> N
 def test_edges_are_validated(chain: dict[str, Node]) -> None:
     with pytest.raises(InvalidEdge):
         create_edge(Edge.Kind.MADE_AT, chain["part"], chain["supplier"])
+
+
+def test_nodes_are_validated() -> None:
+    validate_node(Node.Kind.FACILITY, "factory")
+    with pytest.raises(InvalidNode):
+        validate_node(Node.Kind.FACILITY, "supplier")
+    with pytest.raises(InvalidNode):
+        validate_node("warehouse", "factory")
 
 
 def test_import_keeps_dual_sourcing_and_shared_toy_ids() -> None:

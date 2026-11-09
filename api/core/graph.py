@@ -1,4 +1,4 @@
-"""Graph operations: edge validation and traversals (Postgres recursive CTEs).
+"""Graph operations: node and edge validation and traversals (Postgres recursive CTEs).
 
 Edges point from dependent to dependency (toy -> part -> factory -> supplier), so:
 - walking *down* (source -> target) finds what something depends on;
@@ -15,6 +15,14 @@ from django.db.models import QuerySet
 
 from core.models import SEVERITY_RANK, Edge, Incident, Node, worst_severity
 
+# Which roles each node kind may have. `Node.kind` choices and `Node.role` are not enforced by the
+# database, so nodes are checked with `validate_node` before they are saved.
+ALLOWED_ROLES: dict[str, frozenset[str]] = {
+    Node.Kind.ORGANIZATION: frozenset({"finisher", "supplier", "basic_materials", "retailer"}),
+    Node.Kind.FACILITY: frozenset({"factory"}),
+    Node.Kind.ITEM: frozenset({"product", "part", "material"}),
+}
+
 # Which node kinds each edge kind may connect. The generic tables can't enforce this, so every
 # edge is created through `create_edge` (or checked with `validate_edge` before a bulk insert).
 ALLOWED_EDGES: dict[str, tuple[str, str]] = {
@@ -29,8 +37,20 @@ SUPPLY_EDGES = [Edge.Kind.CONTAINS, Edge.Kind.MADE_AT, Edge.Kind.OPERATED_BY]
 MAX_DEPTH = 20
 
 
+class InvalidNode(ValueError):
+    pass
+
+
 class InvalidEdge(ValueError):
     pass
+
+
+def validate_node(kind: str, role: str) -> None:
+    roles = ALLOWED_ROLES.get(kind)
+    if roles is None:
+        raise InvalidNode(f"Unknown node kind {kind!r}")
+    if role not in roles:
+        raise InvalidNode(f"{kind} role must be one of {sorted(roles)}, got {role!r}")
 
 
 def validate_edge(kind: str, source: Node, target: Node) -> None:

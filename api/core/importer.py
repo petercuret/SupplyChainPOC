@@ -7,7 +7,7 @@ from typing import Any
 
 from django.db import transaction
 
-from core.graph import validate_edge
+from core.graph import validate_edge, validate_node
 from core.models import Edge, Node
 
 SEED_DIR = Path(__file__).resolve().parent.parent / "seed_data"
@@ -20,6 +20,7 @@ def _rows(directory: Path, name: str) -> list[dict[str, str]]:
 
 def _node(kind: str, role: str, external_id: str, name: str, owner: Node | None = None,
           **attrs: Any) -> Node:  # fmt: skip
+    validate_node(kind, role)
     node, _ = Node.objects.update_or_create(
         owner=owner,
         kind=kind,

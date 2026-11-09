@@ -18,8 +18,7 @@ class Node(models.Model):
         ITEM = "item"
 
     kind = models.CharField(max_length=32, choices=Kind)
-    # organization: finisher | supplier | basic_materials | retailer
-    # facility: factory      item: product | part | material
+    # Allowed roles per kind are listed in `core.graph.ALLOWED_ROLES`.
     role = models.CharField(max_length=32)
     external_id = models.CharField(max_length=64)
     # Tenant scope: the finisher a product belongs to. Shared nodes (suppliers, parts) have none.
